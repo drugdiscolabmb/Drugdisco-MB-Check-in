@@ -1,0 +1,7 @@
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
+
+# Claude's preview images (not part of the website)
+Claude outputs/

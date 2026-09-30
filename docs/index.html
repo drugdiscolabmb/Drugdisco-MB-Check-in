@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DRUG_DISCO_LAB — presence</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <!-- The dashboard is designed for a portrait (vertical) screen.
+       On a landscape screen it shows as a centred portrait column. -->
+  <div class="stage" id="stage">
+    <div class="window">
+      <div class="scan" aria-hidden="true"></div>
+
+      <!-- title bar -->
+      <header class="titlebar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="title">DRUG_DISCO_LAB — presence.sh</div>
+        <span class="demo-tag" id="demoTag" hidden>DEMO</span>
+        <span class="live" id="livePill"><i></i><b id="liveText">LIVE</b></span>
+      </header>
+
+      <!-- day banner -->
+      <section class="hero">
+        <div class="prompt"><span id="prompt">$ lab --status --live</span> <span class="cursor"></span></div>
+        <h1 class="sr-only" id="dayName"></h1>
+        <pre class="banner" id="banner" aria-hidden="true"></pre>
+        <div class="motto-box" id="mottoBox">
+          <div class="motto-label">// motto_of_the_day.txt</div>
+          <div class="motto" id="mottoLine"><span class="gt">&gt;</span> <span id="motto"></span><span class="cursor"></span></div>
+        </div>
+      </section>
+
+      <!-- clock -->
+      <section class="clockrow">
+        <div class="bigclock" id="bigClock">
+          <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><small id="ss">--</small>
+        </div>
+        <div class="clock-side">
+          <div class="date" id="dateText"></div>
+          <div class="week" id="week"></div>
+        </div>
+      </section>
+
+      <!-- counts -->
+      <section class="stats">
+        <div class="stat stat-in"><span class="k">in_lab:</span> <span class="v" id="statIn">00</span></div>
+        <div class="stat"><span class="k">out:</span> <span class="v" id="statOut">00</span></div>
+        <div class="stat"><span class="k">total:</span> <span class="v" id="statTotal">00</span></div>
+      </section>
+
+      <!-- members -->
+      <main class="members" id="members">
+       <div id="membersInner">
+        <div class="section-head" id="inHead">// members :: status=IN [0]</div>
+        <div class="in-grid" id="inList"></div>
+        <div class="empty" id="inEmpty" hidden>&gt; lab is empty. first one in gets the good chair<span class="cursor"></span></div>
+
+        <div class="section-head out-head" id="outHead">// members :: status=OUT [0]</div>
+        <div class="out-grid" id="outList"></div>
+       </div>
+      </main>
+
+      <!-- ASCII animation of the day, fills the empty space when few people are in -->
+      <section class="ambient" id="ambient" hidden aria-hidden="true">
+        <div class="ambient-head"><span id="ambCmd">$ dna.sh</span><span id="ambNote"></span></div>
+        <div class="helix" id="helix"><pre class="h-back"></pre><pre class="h-rung"></pre><pre class="h-front"></pre><canvas id="ambCanvas" hidden></canvas></div>
+      </section>
+
+      <footer class="footer">
+        <span>// presence.sh v0.2</span>
+        <span id="syncText">// waiting for data…</span>
+      </footer>
+
+      <div class="offline-banner" id="offlineBanner" hidden>
+        <span class="cursor"></span> connection lost — reconnecting…
+      </div>
+    </div>
+  </div>
+
+  <!-- boot screen, shown for a few seconds when the page loads -->
+  <div class="boot" id="boot" hidden><div class="boot-inner" id="bootInner"></div></div>
+
+  <!-- faint CRT scan-lines over everything -->
+  <div class="crt" aria-hidden="true"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/themes.js"></script>
+  <script src="js/banners.js"></script>
+  <script src="js/structures.js"></script>
+  <script src="js/ambient.js"></script>
+  <script src="js/data-demo.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

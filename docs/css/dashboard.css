@@ -249,6 +249,7 @@ body.hide-cursor, body.hide-cursor * { cursor: none !important; }
 .members {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   padding: .2em 1.1em .8em;
   overflow: hidden;
   font-size: calc(1em * var(--mfit));
@@ -356,14 +357,16 @@ body.hide-cursor, body.hide-cursor * { cursor: none !important; }
 /* OUT: compact and dimmed */
 .out-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(28em, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(28em, 100%), 1fr));
   gap: .3em 1.2em;
   opacity: .45;
 }
-.out-row { display: flex; align-items: baseline; gap: .6em; white-space: nowrap; overflow: hidden; font-size: .9em; }
+.out-row { display: flex; align-items: baseline; gap: .6em; white-space: nowrap; overflow: hidden; font-size: .9em; min-width: 0; }
+.out-row > * { flex-shrink: 0; }
 .out-row .ini { font-weight: 800; min-width: 1.8em; }
 .out-row .nick { font-size: 1em; }
-.out-row .left { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.out-row .pos { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }   /* shrinks first */
+.out-row .left { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }   /* always visible */
 
 .empty { color: var(--muted); padding: .4em 0 .2em; }
 

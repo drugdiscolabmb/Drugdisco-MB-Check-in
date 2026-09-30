@@ -333,15 +333,18 @@
     const box = $('members');
     const amb = $('ambient');
     amb.hidden = true;
-    let fit = 1.45;
-    root.setProperty('--mfit', fit);
-    while (box.scrollHeight > box.clientHeight + 1 && fit > 0.6) {
-      fit = Math.round((fit - 0.05) * 100) / 100;
-      root.setProperty('--mfit', fit);
-    }
     const cs = getComputedStyle(box);
-    const free = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
-      - $('membersInner').offsetHeight - 12;
+    const room = () => box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const used = () => $('membersInner').offsetHeight;
+    const set = (f) => { root.setProperty('--mfit', f); return f; };
+    const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--base')) || 20;
+    // first try to keep ~30% of the space for the animation, without making cards too small
+    const reserve = Math.max(base * 12, room() * 0.3);
+    let fit = set(1.45);
+    while (used() > room() - reserve && fit > 0.95) fit = set(Math.round((fit - 0.05) * 100) / 100);
+    // if it still doesn't fit, give up the animation and shrink until everyone fits
+    while (used() > room() - 2 && fit > 0.6) fit = set(Math.round((fit - 0.05) * 100) / 100);
+    const free = room() - used() - 12;
     helix.resize(free);
   }
 

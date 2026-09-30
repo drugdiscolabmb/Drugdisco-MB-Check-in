@@ -10,7 +10,7 @@ Live "who's in the lab" board for the Drug Disco Lab.
 
 ## Preview the dashboard
 
-- Online: `https://<your-github-username>.github.io/<repo-name>/`
+- Online: `https://drugdiscolabmb.github.io/Drugdisco-MB-Check-in/`
 - Try other day themes: add `?day=friday` (or `mon`, `tue`, …) to the address.
 
 ## Settings

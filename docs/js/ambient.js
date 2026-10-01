@@ -5,7 +5,7 @@
  *   Tue  protein.sh    3D protein cartoons (real PDB structures) coloured by
  *                      helix / strand / loop, drawn 2.5D, coming and going (canvas)
  *   Wed  dna.sh        DNA double helix with random mutations (and the odd repair)
- *   Thu  culture.sh    many cell types (RBC, neuron, yeast, bacteria…) growing and dividing
+ *   Thu  culture.sh    one cell type per dish (RBC, neuron, yeast, bacteria…), from 1 cell to a full dish
  *   Fri  train.py      a small neural network classifying silly things
  *   Sat  virus.sh      a virus spreading copies of itself
  *   Sun  molecule.sh   a small molecule slowly turning (zzz)
@@ -337,25 +337,27 @@ window.LAB = window.LAB || {};
   const TYPE_NAMES = Object.keys(CELL_TYPES);
 
   function culture() {
-    let cells = [], last = null, hours = 0, fullAt = null;
+    // one cell type per culture: start from a single cell, grow until the dish is
+    // full, passage it, then the next type gets the dish
+    const NICE = { stem: 'stem cell', rbc: 'red blood cell', bacterium: 'bacterium', neuron: 'neuron',
+                   epithelial: 'epithelial cell', yeast: 'yeast', astrocyte: 'astrocyte' };
+    const order = TYPE_NAMES.slice().sort(() => Math.random() - 0.5);
+    let cells = [], last = null, hours = 0, fullAt = null, round = -1;
     return (c, t) => {
       const dt = last == null ? 0 : Math.min(0.5, t - last);
       last = t;
       const W = c.cols * c.ar, H = c.rows - 1;                 // area in row units (last row = label)
       const r0 = Math.max(1.4, c.rows * 0.1), rMax = r0 * 1.5;
       const cap = Math.max(5, Math.floor((W * H) / (Math.PI * Math.pow(rMax * 1.6, 2))));
-      if (!cells.length) {                                      // seed the dish with a few different types
-        hours = 0;
-        const types = TYPE_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
-        cells = types.map((type, i) => ({
-          type, x: W * ((i + 0.5) / types.length), y: H / 2 + rand(-1, 1),
-          r: r0 * rand(1, 1.3), a: rand(0, TAU), va: rand(-0.3, 0.3),
-        }));
+      if (!cells.length) {                                      // a fresh dish with one single cell
+        hours = 0; round++;
+        cells = [{ type: order[round % order.length], x: W / 2, y: H / 2, r: r0 * 1.2, a: rand(0, TAU), va: rand(-0.3, 0.3) }];
       }
+      const type = order[round % order.length];
 
       if (fullAt == null) {
         hours += dt * 2;
-        cells.forEach((k) => { k.r += dt * r0 * rand(0.04, 0.09); k.a += k.va * dt; });
+        cells.forEach((k) => { k.r += dt * r0 * rand(0.06, 0.11); k.a += k.va * dt; });
         const next = [];
         cells.forEach((k) => {
           if (k.r >= rMax && cells.length + next.length < cap) {
@@ -388,19 +390,11 @@ window.LAB = window.LAB || {};
       }
       cells.forEach((k) => CELL_TYPES[k.type](c, k.x / c.ar, k.y, k.r - 0.3, k.a, (k.r - r0) / (rMax - r0)));
 
-      const kinds = new Set(cells.map((k) => k.type)).size;
       const msg = fullAt != null ? '100% confluent — passaging 1:10...'
-        : `t = ${Math.floor(hours)}h   cells = ${cells.length}   types = ${kinds}`;
+        : `t = ${Math.floor(hours)}h   cells = ${cells.length}`;
       c.text(fullAt != null ? 2 : 1, 1, c.rows - 1, msg);
-      // name tags for the different cell types (small, under each first-of-its-kind)
-      const seen = new Set();
-      cells.forEach((k) => {
-        if (seen.has(k.type) || fullAt != null) return;
-        seen.add(k.type);
-        const label = k.type === 'rbc' ? 'RBC' : k.type;
-        const ly = Math.round(k.y + k.r + 0.6);
-        if (ly < c.rows - 1) c.text(0, Math.round(k.x / c.ar - label.length / 2), ly, label);
-      });
+      const name = `culture #${round + 1}: ${NICE[type] || type}`;   // which cell type this dish has
+      c.text(2, Math.max(0, c.cols - name.length - 1), c.rows - 1, name);
     };
   }
 
@@ -701,7 +695,7 @@ window.LAB = window.LAB || {};
     monday:    { cmd: 'drugs.sh --float',          note: '// no labels. name them all.',      canvas: true, pixel: true, make: drugs2d },
     tuesday:   { cmd: 'protein.sh --cartoon',      note: '// proteins from our lab, via the PDB', canvas: true, pixel: true, make: proteins3d },
     wednesday: { cmd: 'dna.sh --spin --mutate',    note: "// 5'→3', mistakes included",         size: 1.1, make: dna },
-    thursday:  { cmd: 'culture.sh --grow --mixed', note: '// feed them before the weekend',   size: 0.9, maxRows: 18, make: culture },
+    thursday:  { cmd: 'culture.sh --grow',         note: '// feed them before the weekend',   size: 0.9, maxRows: 18, make: culture },
     friday:    { cmd: 'train.py --epochs=inf',     note: '// accuracy may vary',              size: 1.0, make: neural },
     saturday:  { cmd: 'virus.sh --spread',         note: '// contained. probably.',          size: 1.0, make: virus },
     sunday:    { cmd: 'molecule.sh --relax',       note: '// take a rest. zzz',               size: 1.0, make: molecule },

@@ -363,7 +363,7 @@
     const t0 = performance.now();
 
     function textFrame(t) {
-      const L = [0, 1, 2].map(() => Array.from({ length: rows }, () => Array(cols).fill(' ')));
+      const L = [...layers].map(() => Array.from({ length: rows }, () => Array(cols).fill(' ')));
       const put = (l, x, y, c) => {
         x = Math.round(x); y = Math.round(y);
         if (x >= 0 && x < cols && y >= 0 && y < rows) L[l][y][x] = c;
@@ -379,8 +379,9 @@
       draw(ctx, t);
       // a character on a higher layer hides whatever is behind it
       for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-        if (L[2][y][x] !== ' ') { L[1][y][x] = ' '; L[0][y][x] = ' '; }
-        else if (L[1][y][x] !== ' ') L[0][y][x] = ' ';
+        let top = -1;
+        for (let l = L.length - 1; l >= 0; l--) if (L[l][y][x] !== ' ') { top = l; break; }
+        for (let l = 0; l < top; l++) L[l][y][x] = ' ';
       }
       layers.forEach((pre, i) => { pre.textContent = L[i].map((r) => r.join('')).join('\n'); });
     }

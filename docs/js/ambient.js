@@ -5,13 +5,13 @@
  *   Tue  protein.sh    3D protein cartoons (real PDB structures) coloured by
  *                      helix / strand / loop, drawn 2.5D, coming and going (canvas)
  *   Wed  dna.sh        DNA double helix with random mutations (and the odd repair)
- *   Thu  culture.sh    cells growing and dividing over time
- *   Fri  train.py      a small neural network processing data
+ *   Thu  culture.sh    many cell types (RBC, neuron, yeast, bacteria…) growing and dividing
+ *   Fri  train.py      a small neural network classifying silly things
  *   Sat  virus.sh      a virus spreading copies of itself
  *   Sun  molecule.sh   a small molecule slowly turning (zzz)
  *
- * Drawing happens on a character grid with three layers:
- *   0 = back (pale)   1 = middle   2 = front (full day colour)
+ * Drawing happens on a character grid with four layers:
+ *   0 = back (pale)   1 = middle   2 = front (full day colour)   3 = alert (red)
  * ctx.put(layer, x, y, char) — x in columns, y in rows.
  * ctx.ar = width of one character ÷ its height (≈ 0.6); used so circles
  * come out round instead of squashed.
@@ -44,48 +44,73 @@ window.LAB = window.LAB || {};
   }
 
   /* ── Wed: DNA, with random mutations ───────────────────── */
+  /* Every few seconds something happens to the sequence: a point mutation,
+     an insertion or deletion (the rest of the strand shifts = frameshift),
+     UV damage, a CRISPR edit, or the cell repairs an earlier mistake. */
   function dna() {
     const PAIR = { A: 'T', T: 'A', G: 'C', C: 'G' };
     const PURINE = { A: 1, G: 1 };                       // A<->G and C<->T swaps are "transitions"
-    const bases = [];                                     // the sequence, one base per rung column
-    const baseAt = (x) => bases[x] || (bases[x] = 'ATGC'[(x * x * 31 + x * 7 + 3) % 4]);
-    const mutated = new Map();                            // column → { from, t0 }
-    let event = null, nextAt = 4, last = 0;
+    const randBase = () => 'ATGC'[Math.floor(Math.random() * 4)];
+    let seq = [];                                         // one base per rung (rung k sits at column 2k)
+    let marks = new Map();                                // rung → { from } for bases that are mutated
+    let event = null, nextAt = 6, last = 0;            // first one after the boot screen
 
-    function mutate(c, t) {
-      // sometimes the cell's repair machinery fixes an earlier mutation
-      if (mutated.size && Math.random() < 0.3) {
-        const [x, m] = [...mutated.entries()][Math.floor(Math.random() * mutated.size)];
-        const bad = baseAt(x);
-        bases[x] = m.from; mutated.delete(x);
-        event = { x, t0: t, repair: true, text: `DNA repair @ bp ${1000 + x}: ${bad}→${m.from} fixed ✓` };
-        return;
+    const shiftMarks = (k, by) => {                       // move marks after an insertion / deletion
+      const m = new Map();
+      for (const [i, v] of marks) if (i < k) m.set(i, v); else if (i + by >= k) m.set(i + by, v);
+      marks = m;
+    };
+
+    function mutate(rungs, t) {
+      const k = 1 + Math.floor(Math.random() * (rungs - 2));
+      const bp = 1000 + k;
+      const r = Math.random();
+      if (marks.size >= 14) {                             // too many: roll back to a clean copy
+        for (const [i, m] of marks) if (m.from) seq[i] = m.from;
+        marks.clear();
+        event = { k: -1, t0: t, good: true, text: '>> genome restored from backup. phew.' };
+      } else if (r < 0.15 && marks.size) {                // repair an earlier point mutation
+        const subs = [...marks].filter(([, m]) => m.from);
+        if (!subs.length) return mutate(rungs, t);
+        const [i, m] = pick(subs);
+        const bad = seq[i]; seq[i] = m.from; marks.delete(i);
+        event = { k: i, t0: t, good: true, text: `DNA repair @ bp ${1000 + i}: ${bad}→${m.from} fixed ✓` };
+      } else if (r < 0.32) {                              // insertion → everything after shifts right
+        const b = randBase();
+        seq.splice(k, 0, b); seq.length = rungs;
+        shiftMarks(k, 1); marks.set(k, {});
+        event = { k, t0: t, text: `!! insertion @ bp ${bp}: +${b} (frameshift!)` };
+      } else if (r < 0.48) {                              // deletion → everything after shifts left
+        const b = seq[k];
+        seq.splice(k, 1); seq.push(randBase());
+        marks.delete(k); shiftMarks(k + 1, -1);
+        event = { k, t0: t, text: `!! deletion @ bp ${bp}: -${b} (frameshift!)` };
+      } else if (r < 0.58) {                              // UV damage: two neighbouring Ts stick together
+        seq[k] = 'T'; seq[k + 1] = 'T';
+        marks.set(k, {}); marks.set(k + 1, {});
+        event = { k, t0: t, text: `!! UV hit @ bp ${bp}: thymine dimer T=T ☀` };
+      } else if (r < 0.66) {                              // CRISPR edit
+        const from = seq[k], to = pick('ATGC'.replace(from, '').split(''));
+        seq[k] = to; marks.set(k, { from });
+        event = { k, t0: t, text: `>> CRISPR edit @ bp ${bp}: ${from}→${to} (intended. probably.)` };
+      } else {                                            // point mutation
+        const from = seq[k], to = pick('ATGC'.replace(from, '').split(''));
+        seq[k] = to; marks.set(k, { from });
+        const kind = !PURINE[from] === !PURINE[to] ? 'transition' : 'transversion';
+        event = { k, t0: t, text: `!! point mutation @ bp ${bp}: ${from}→${to} (${kind})` };
       }
-      if (mutated.size >= 12) {                           // too many: roll back to the clean sequence
-        for (const [x, m] of mutated) bases[x] = m.from;
-        mutated.clear();
-        event = { x: -1, t0: t, repair: true, text: '>> genome restored from backup. phew.' };
-        return;
-      }
-      const cols = [];
-      for (let x = 2; x < c.cols - 2; x += 2) if (!mutated.has(x)) cols.push(x);
-      const x = cols[Math.floor(Math.random() * cols.length)];
-      const from = baseAt(x);
-      const to = pick('ATGC'.replace(from, '').split(''));
-      bases[x] = to;
-      mutated.set(x, { from, t0: t });
-      const kind = !PURINE[from] === !PURINE[to] ? 'transition' : 'transversion';
-      event = { x, t0: t, text: `!! mutation @ bp ${1000 + x}: ${from}→${to} (${kind})` };
     }
 
     return (c, t) => {
-      if (t < last) nextAt = t + 4;                       // clock restarted
+      const rungs = Math.ceil(c.cols / 2) + 1;
+      while (seq.length < rungs) { const x = seq.length * 2; seq.push('ATGC'[(x * x * 31 + x * 7 + 3) % 4]); }
+      if (t < last) nextAt = t + 6;                       // clock restarted
       last = t;
-      if (t >= nextAt) { mutate(c, t); nextAt = t + 6 + Math.random() * 6; }
+      if (t >= nextAt) { mutate(rungs, t); nextAt = t + 4 + Math.random() * 4; }
 
       const rows = Math.min(c.rows - 2, 11) | 1;          // leave a row above (marker) and below (message)
       const oy = Math.max(1, Math.floor((c.rows - rows) / 2));
-      const flashing = event && t - event.t0 < 3.5;
+      const fresh = event && t - event.t0 < 3.5;
       const blinkOn = Math.floor(t * 4) % 2 === 0;
 
       for (let x = 0; x < c.cols; x++) {
@@ -96,21 +121,40 @@ window.LAB = window.LAB || {};
         c.put(frontA ? 2 : 0, x, oy + ya, '█');
         c.put(frontA ? 0 : 2, x, oy + yb, '█');
         if (x % 2 === 0 && Math.abs(ya - yb) > 2) {
+          const k = x / 2, b = seq[k];
           const top = Math.min(ya, yb), bot = Math.max(ya, yb);
-          const b = baseAt(x);
-          const isNew = flashing && event.x === x && !event.repair;
-          const hot = mutated.has(x);                     // mutated bases stay bold
-          const l = hot ? 2 : 1;
-          c.put(l, x, oy + top + 1, isNew && !blinkOn ? '█' : b);
-          c.put(l, x, oy + bot - 1, isNew && !blinkOn ? '█' : PAIR[b]);
-          for (let y = top + 2; y < bot - 1; y++) c.put(l, x, oy + y, hot ? '┆' : '│');
+          const hot = marks.has(k);                       // mutated base pairs stay RED
+          const l = hot ? 3 : 1;
+          c.put(l, x, oy + top + 1, b);
+          c.put(l, x, oy + bot - 1, PAIR[b]);
+          for (let y = top + 2; y < bot - 1; y++) c.put(l, x, oy + y, hot ? '┃' : '│');
         }
       }
 
-      // marker above the changed base pair, and the message underneath
-      if (flashing && event.x >= 0) c.put(2, event.x, oy - 1, event.repair ? '✓' : blinkOn ? '▼' : '▽');
-      const msg = flashing ? event.text : `mutations: ${mutated.size}`;
-      c.text(flashing ? 2 : 1, Math.max(0, c.cols - msg.length - 1), c.rows - 1, msg);
+      // a brand-new mutation: blinking red column, a burst of sparks, a marker and the base change
+      if (fresh && event.k >= 0) {
+        const age = t - event.t0;
+        const cols = [event.k * 2];
+        if (event.text.includes('dimer')) cols.push(event.k * 2 + 2);
+        const midY = oy + (rows - 1) / 2;
+        cols.forEach((X) => {
+          if (!event.good && age < 2.5) {
+            for (let y = oy; y < oy + rows; y++) c.put(3, X, y, blinkOn ? '█' : '▓');
+            const b = seq[X / 2];
+            c.put(blinkOn ? 1 : 3, X, Math.round(midY), b);         // the new base, flashing in the bar
+          }
+          if (age < 1.4) {                                         // sparks fly outwards
+            const R = 1 + age * 7;
+            for (let i = 0; i < 10; i++) {
+              const a = (i * TAU) / 10;
+              c.put(event.good ? 2 : 3, X + (Math.cos(a) * R) / c.ar * 0.6, midY + Math.sin(a) * R * 0.5, age < 0.7 ? '*' : '·');
+            }
+          }
+        });
+        c.put(event.good ? 2 : 3, cols[0], oy - 1, event.good ? '✓' : blinkOn ? '▼' : '▽');
+      }
+      const msg = fresh ? event.text : `mutations: ${marks.size}`;
+      c.text(fresh ? (event.good ? 2 : 3) : 1, Math.max(0, c.cols - msg.length - 1), c.rows - 1, msg);
     };
   }
 
@@ -165,81 +209,159 @@ window.LAB = window.LAB || {};
     };
   }
 
-  /* ── Fri: neural network processing data ────────────────── */
+  /* ── Fri: neural network classifying silly things ────────── */
+  /* Every ~16 seconds the model switches to a new (very important) task.
+     Inputs on the left, a signal runs through the layers, and the answer
+     lights up on the right — with growing confidence each epoch. */
+  const NN_TASKS = [
+    { task: 'is it the weekend yet?',       inputs: ['day', 'mood', 'coffee'],   outputs: ['weekend', 'working day'], win: 0 },
+    { task: 'hotdog or not hotdog',         inputs: ['shape', 'color', 'mustard'], outputs: ['hotdog', 'not hotdog'], win: 0 },
+    { task: 'will the experiment work?',    inputs: ['reagent', 'p-value', 'luck'], outputs: ['works', 'fails', 'works once only'], win: 2 },
+    { task: "is the PI in a good mood?",    inputs: ['grant', 'coffee', 'rev #2'], outputs: ['good mood', 'hide'], win: 1 },
+    { task: 'cat classifier',               inputs: ['ears', 'whisker', 'attitude'], outputs: ['cat', 'dog', 'loaf'], win: 2 },
+    { task: "what's for lunch?",            inputs: ['budget', 'hunger', 'queue'], outputs: ['kra pao', 'khao man gai', 'skip it'], win: 0 },
+    { task: 'is this p-value significant?', inputs: ['p=0.049', 'n=3', 'vibes'], outputs: ['significant', 'p-hacked'], win: 1 },
+    { task: 'reviewer 2 decision',          inputs: ['figures', 'novelty', 'mood'], outputs: ['accept', 'major rev.', 'reject'], win: 1 },
+    { task: 'is the docking hit real?',     inputs: ['score', 'pose', 'hope'], outputs: ['real hit', 'artifact'], win: 1 },
+    { task: 'train one more epoch?',        inputs: ['loss', 'time', 'sanity'], outputs: ['yes', 'go home'], win: 1 },
+    { task: 'is the coffee machine free?',  inputs: ['queue', 'noise', 'smell'], outputs: ['free', 'busy', 'broken'], win: 2 },
+    { task: 'is this cell line mycoplasma-free?', inputs: ['growth', 'shape', 'faith'], outputs: ['clean', 'test again'], win: 1 },
+  ];
+
   function neural() {
-    const LAYERS = [3, 4, 4, 2];
-    const OUT = ['weekend', 'working day'];
+    const HIDDEN = [4, 4];
+    const PASS = 2.6, PASSES_PER_TASK = 6;
+    const order = NN_TASKS.map((_, i) => i).sort(() => Math.random() - 0.5);
     return (c, t) => {
-      const period = 2.6;
-      const epoch = (Math.floor(t / period) % 40) + 1;          // training restarts after 40 epochs
-      const p = (t % period) / period;
+      const passNo = Math.floor(t / PASS);
+      const task = NN_TASKS[order[Math.floor(passNo / PASSES_PER_TASK) % order.length]];
+      const epoch = (passNo % PASSES_PER_TASK) + 1;
+      const p = (t % PASS) / PASS;
+      const LAYERS = [task.inputs.length, ...HIDDEN, task.outputs.length];
       const nL = LAYERS.length;
-      const H = c.rows - 1;                                     // last row = training stats
-      const gap = (H - 1) / (Math.max(...LAYERS) + 1);         // rows between nodes
+      const H = c.rows - 1;                                     // last row = training stats, first row = task
+      const outW = Math.max(...task.outputs.map((o) => o.length)) + 5;
+      const inW = Math.max(...task.inputs.map((s) => s.length)) + 2;
+      const x0 = inW + 2, x1 = c.cols - outW - 4;
+      const xs = LAYERS.map((_, i) => Math.round(x0 + ((x1 - x0) * i) / (nL - 1)));
+      const gap = (H - 2) / (Math.max(...LAYERS) + 1);
       const big = gap >= 3.2;
-      const node = (l, x, y) => {                               // a node: small bar, or a round-ish block if there's room
+      const node = (l, x, y) => {
         for (let dx = -2; dx <= 2; dx++) c.put(l, x + dx, y, '█');
         if (big) for (let dx = -1; dx <= 1; dx++) { c.put(l, x + dx, y - 1, '█'); c.put(l, x + dx, y + 1, '█'); }
       };
-      const r = big ? 1.2 : 0.6;                                // node half-height, for label spacing
-      const xs = LAYERS.map((_, i) => Math.round(c.cols * (0.13 + (0.54 * i) / (nL - 1))));
-      const nodes = LAYERS.map((n, i) => Array.from({ length: n }, (_, j) => ({ x: xs[i], y: Math.round(((H - 1) * (j + 1)) / (n + 1)) })));
+      const nodes = LAYERS.map((n, i) => Array.from({ length: n }, (_, j) => ({ x: xs[i], y: 1 + Math.round(((H - 2) * (j + 1)) / (n + 1)) })));
 
-      // connections
+      c.text(1, 1, 0, `task: ${task.task}`);
       for (let i = 0; i < nL - 1; i++)
         nodes[i].forEach((a) => nodes[i + 1].forEach((b) => c.line(0, a.x, a.y, b.x, b.y, '·')));
 
       // the signal travels one layer at a time, then the answer shows
       const s = p * nL, k = Math.floor(s), f = s - k;
       if (k < nL - 1) {
-        nodes[k].forEach((a) => nodes[k + 1].forEach((b) =>
-          c.put(1, a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, '•')));
+        nodes[k].forEach((a) => nodes[k + 1].forEach((b) => c.put(1, a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, '•')));
       }
+      const done = k === nL - 1;
       nodes.forEach((layer, i) => layer.forEach((n, j) => {
-        const lit = i === k || (i === k + 1 && f > 0.85) || (i === nL - 1 && k === nL - 1 && j === 0);
+        const lit = i === k || (i === k + 1 && f > 0.85) || (i === nL - 1 && done && j === task.win);
         node(lit ? 2 : i < k ? 1 : 0, n.x, n.y);
       }));
+      nodes[0].forEach((n, j) => c.text(k === 0 ? 2 : 1, n.x - 3 - task.inputs[j].length, n.y, task.inputs[j]));
 
-      // input data coming in on the left
-      nodes[0].forEach((n, j) => {
-        const bits = ((epoch * 37 + j * 11) % 16).toString(2).padStart(4, '0');
-        const slide = k === 0 ? Math.round(f * 2) : 2;
-        c.text(k === 0 ? 2 : 1, n.x - 10 + slide, n.y, bits);
-      });
-
-      // output labels, with confidence once the signal arrives
-      const conf = Math.min(99, 55 + epoch * 3);
+      // confidence in the (silly) answer grows each epoch
+      const conf = Math.min(99, 52 + epoch * 8);
+      const rest = task.outputs.length - 1;
       nodes[nL - 1].forEach((n, j) => {
-        const done = k === nL - 1;
-        const label = done ? `${OUT[j]} ${j === 0 ? conf : 100 - conf}%` : OUT[j];
-        c.text(done && j === 0 ? 2 : 1, n.x + 4, n.y, label);
+        const pct = j === task.win ? conf : Math.round((100 - conf) / rest);
+        const label = done ? `${task.outputs[j]} ${pct}%` : task.outputs[j];
+        c.text(done && j === task.win ? 2 : 1, n.x + 4, n.y, label);
       });
-
-      const loss = (0.9 * Math.exp(-epoch / 6) + 0.03).toFixed(3);
-      c.text(1, 1, c.rows - 1, `epoch ${String(epoch).padStart(2, '0')}   loss ${loss}   acc ${conf}%`);
+      const loss = (0.9 * Math.exp(-epoch / 2.2) + 0.03).toFixed(3);
+      c.text(1, 1, c.rows - 1, `epoch ${String(epoch).padStart(2, '0')}/${PASSES_PER_TASK}   loss ${loss}   acc ${conf}%`);
     };
   }
 
-  /* ── Thu: cell culture growing ──────────────────────────── */
+  /* ── Thu: cell culture growing — many cell types ────────── */
+  /* Each cell type has its own look. Cells grow, divide into two of the same
+     type, push each other around, and when the dish is full it gets passaged. */
+  function ring(c, l, cx, cy, r, inner, ch = '█') {           // a doughnut: filled between inner and r
+    const rx = r / c.ar;
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+      for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const d = Math.hypot((x - cx) * c.ar, y - cy);
+        if (d <= r && d >= inner) c.put(l, x, y, ch);
+      }
+    }
+  }
+  const CELL_TYPES = {
+    stem(c, x, y, r) {                                          // plain round cell, big nucleus
+      disc(c, 1, x, y, r); disc(c, 2, x, y, r * 0.45);
+    },
+    rbc(c, x, y, r) {                                           // red blood cell: doughnut, no nucleus
+      ring(c, 2, x, y, r, r * 0.45); disc(c, 0, x, y, r * 0.44, '░');
+    },
+    bacterium(c, x, y, r, a) {                                  // rod with rounded ends
+      const dx = (Math.cos(a) * r * 0.75) / c.ar, dy = Math.sin(a) * r * 0.75;
+      bar(c, 1, x - dx, y - dy, x + dx, y + dy, r * 0.9);
+      bar(c, 2, x - dx * 0.4, y - dy * 0.4, x + dx * 0.4, y + dy * 0.4, r * 0.25, '▓');
+    },
+    neuron(c, x, y, r, a) {                                     // small body with branching dendrites
+      for (let i = 0; i < 4; i++) {
+        const b = a + (i * TAU) / 4 + 0.3 * i;
+        const ex = x + (Math.cos(b) * r * 1.5) / c.ar, ey = y + Math.sin(b) * r * 1.5;
+        bar(c, 1, x, y, ex, ey, 0.4, '▓');
+        bar(c, 1, ex, ey, ex + (Math.cos(b + 0.6) * r * 0.5) / c.ar, ey + Math.sin(b + 0.6) * r * 0.5, 0.3, '░');
+      }
+      disc(c, 1, x, y, r * 0.55); disc(c, 2, x, y, r * 0.25);
+    },
+    epithelial(c, x, y, r) {                                    // boxy cell
+      const hx = (r * 0.85) / c.ar, hy = r * 0.75;
+      for (let yy = Math.round(y - hy); yy <= Math.round(y + hy); yy++)
+        for (let xx = Math.round(x - hx); xx <= Math.round(x + hx); xx++) c.put(1, xx, yy, '█');
+      disc(c, 2, x, y, r * 0.3);
+    },
+    yeast(c, x, y, r, a, k) {                                   // oval with a growing bud
+      disc(c, 1, x, y, r * 0.85);
+      const bud = r * (0.2 + 0.35 * k);
+      disc(c, 1, x + (Math.cos(a) * (r * 0.85 + bud * 0.6)) / c.ar, y + Math.sin(a) * (r * 0.85 + bud * 0.6), bud, '▓');
+      disc(c, 2, x, y, r * 0.25);
+    },
+    astrocyte(c, x, y, r, a) {                                  // star-shaped
+      for (let i = 0; i < 7; i++) {
+        const b = a + (i * TAU) / 7;
+        bar(c, 1, x, y, x + (Math.cos(b) * r * 1.3) / c.ar, y + Math.sin(b) * r * 1.3, 0.35, '▓');
+      }
+      disc(c, 1, x, y, r * 0.5); disc(c, 2, x, y, r * 0.22);
+    },
+  };
+  const TYPE_NAMES = Object.keys(CELL_TYPES);
+
   function culture() {
     let cells = [], last = null, hours = 0, fullAt = null;
     return (c, t) => {
       const dt = last == null ? 0 : Math.min(0.5, t - last);
       last = t;
-      const W = c.cols * c.ar, H = c.rows - 1;           // area in row units (last row = label)
-      const cap = Math.max(4, Math.floor((W * H) / (Math.PI * Math.pow(Math.max(1.6, c.rows * 0.17) * 1.55, 2))));
-      const r0 = Math.max(1.6, c.rows * 0.17), rMax = r0 * 1.5;       // newborn / ready-to-divide size
-      if (!cells.length) { cells = [{ x: W / 2, y: H / 2, r: r0 }]; hours = 0; }
+      const W = c.cols * c.ar, H = c.rows - 1;                 // area in row units (last row = label)
+      const r0 = Math.max(1.4, c.rows * 0.1), rMax = r0 * 1.5;
+      const cap = Math.max(5, Math.floor((W * H) / (Math.PI * Math.pow(rMax * 1.6, 2))));
+      if (!cells.length) {                                      // seed the dish with a few different types
+        hours = 0;
+        const types = TYPE_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+        cells = types.map((type, i) => ({
+          type, x: W * ((i + 0.5) / types.length), y: H / 2 + rand(-1, 1),
+          r: r0 * rand(1, 1.3), a: rand(0, TAU), va: rand(-0.3, 0.3),
+        }));
+      }
 
       if (fullAt == null) {
         hours += dt * 2;
-        cells.forEach((k) => { k.r += dt * r0 * 0.07; });
+        cells.forEach((k) => { k.r += dt * r0 * rand(0.04, 0.09); k.a += k.va * dt; });
         const next = [];
         cells.forEach((k) => {
           if (k.r >= rMax && cells.length + next.length < cap) {
             const a = rand(0, TAU);
-            next.push({ x: k.x + Math.cos(a) * 0.6, y: k.y + Math.sin(a) * 0.4, r: r0 },
-                      { x: k.x - Math.cos(a) * 0.6, y: k.y - Math.sin(a) * 0.4, r: r0 });
+            const kid = (s) => ({ type: k.type, x: k.x + s * Math.cos(a) * 0.6, y: k.y + s * Math.sin(a) * 0.4, r: r0, a: k.a + s, va: rand(-0.3, 0.3) });
+            next.push(kid(1), kid(-1));
           } else next.push(k);
         });
         cells = next;
@@ -251,25 +373,34 @@ window.LAB = window.LAB || {};
       for (let n = 0; n < 3; n++) {
         for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) {
           const a = cells[i], b = cells[j];
-          let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.01;
-          const min = a.r + b.r + 0.2;
+          let dx = b.x - a.x, dy = b.y - a.y; const d = Math.hypot(dx, dy) || 0.01;
+          const spiky = (k) => (k.type === 'neuron' || k.type === 'astrocyte' ? 1.5 : 1.15);
+          const min = a.r * spiky(a) + b.r * spiky(b);
           if (d < min) {
-            const push = (min - d) * 0.25;
-            dx /= d; dy /= d;
+            const push = (min - d) * 0.25; dx /= d; dy /= d;
             a.x -= dx * push; a.y -= dy * push; b.x += dx * push; b.y += dy * push;
           }
         }
         cells.forEach((k) => {
           k.x = Math.max(k.r, Math.min(W - k.r, k.x));
-          k.y = Math.max(k.r * 0.8, Math.min(H - k.r * 0.8, k.y));
+          k.y = Math.max(k.r, Math.min(H - 1 - k.r, k.y));          // keep clear of the label row
         });
       }
-      cells.forEach((k) => {
-        disc(c, 1, k.x / c.ar, k.y, k.r - 0.35);
-        disc(c, 2, k.x / c.ar, k.y, (k.r - 0.35) * 0.42);
-      });
-      const msg = fullAt != null ? '100% confluent — passaging 1:10...' : `t = ${Math.floor(hours)}h   cells = ${cells.length}`;
+      cells.forEach((k) => CELL_TYPES[k.type](c, k.x / c.ar, k.y, k.r - 0.3, k.a, (k.r - r0) / (rMax - r0)));
+
+      const kinds = new Set(cells.map((k) => k.type)).size;
+      const msg = fullAt != null ? '100% confluent — passaging 1:10...'
+        : `t = ${Math.floor(hours)}h   cells = ${cells.length}   types = ${kinds}`;
       c.text(fullAt != null ? 2 : 1, 1, c.rows - 1, msg);
+      // name tags for the different cell types (small, under each first-of-its-kind)
+      const seen = new Set();
+      cells.forEach((k) => {
+        if (seen.has(k.type) || fullAt != null) return;
+        seen.add(k.type);
+        const label = k.type === 'rbc' ? 'RBC' : k.type;
+        const ly = Math.round(k.y + k.r + 0.6);
+        if (ly < c.rows - 1) c.text(0, Math.round(k.x / c.ar - label.length / 2), ly, label);
+      });
     };
   }
 
@@ -570,8 +701,8 @@ window.LAB = window.LAB || {};
     monday:    { cmd: 'drugs.sh --float',          note: '// no labels. name them all.',      canvas: true, pixel: true, make: drugs2d },
     tuesday:   { cmd: 'protein.sh --cartoon',      note: '// proteins from our lab, via the PDB', canvas: true, pixel: true, make: proteins3d },
     wednesday: { cmd: 'dna.sh --spin --mutate',    note: "// 5'→3', mistakes included",         size: 1.1, make: dna },
-    thursday:  { cmd: 'culture.sh --grow',         note: '// feed them before the weekend',   size: 1.0, make: culture },
-    friday:    { cmd: 'train.py --epochs=inf',     note: '// model predicts: weekend',        size: 1.0, make: neural },
+    thursday:  { cmd: 'culture.sh --grow --mixed', note: '// feed them before the weekend',   size: 0.9, maxRows: 18, make: culture },
+    friday:    { cmd: 'train.py --epochs=inf',     note: '// accuracy may vary',              size: 1.0, make: neural },
     saturday:  { cmd: 'virus.sh --spread',         note: '// contained. probably.',          size: 1.0, make: virus },
     sunday:    { cmd: 'molecule.sh --relax',       note: '// take a rest. zzz',               size: 1.0, make: molecule },
   };

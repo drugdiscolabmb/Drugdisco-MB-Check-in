@@ -401,6 +401,7 @@ body.hide-cursor, body.hide-cursor * { cursor: none !important; }
 .h-back  { color: color-mix(in srgb, var(--accent) 35%, var(--surface)); }
 .h-rung  { color: color-mix(in srgb, var(--accent) 65%, var(--surface)); font-weight: 600; }
 .h-front { color: var(--accent); font-weight: 800; }
+.h-hot   { color: #e5383b; font-weight: 800; }          /* layer 3: mutations and alerts, always red */
 #ambCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 /* ── footer ──────────────────────────────────────────────── */

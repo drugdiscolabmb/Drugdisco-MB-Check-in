@@ -4,7 +4,7 @@
  *   Mon  drugs.sh      2D drug molecules in atom colours, coming and going (canvas)
  *   Tue  protein.sh    3D protein cartoons (real PDB structures) coloured by
  *                      helix / strand / loop, drawn 2.5D, coming and going (canvas)
- *   Wed  dna.sh        DNA double helix
+ *   Wed  dna.sh        DNA double helix with random mutations (and the odd repair)
  *   Thu  culture.sh    cells growing and dividing over time
  *   Fri  train.py      a small neural network processing data
  *   Sat  virus.sh      a virus spreading copies of itself
@@ -43,13 +43,51 @@ window.LAB = window.LAB || {};
     }
   }
 
-  /* ── Wed: DNA ───────────────────────────────────────────── */
+  /* ── Wed: DNA, with random mutations ───────────────────── */
   function dna() {
     const PAIR = { A: 'T', T: 'A', G: 'C', C: 'G' };
-    const base = (x) => 'ATGC'[(x * x * 31 + x * 7 + 3) % 4];
+    const PURINE = { A: 1, G: 1 };                       // A<->G and C<->T swaps are "transitions"
+    const bases = [];                                     // the sequence, one base per rung column
+    const baseAt = (x) => bases[x] || (bases[x] = 'ATGC'[(x * x * 31 + x * 7 + 3) % 4]);
+    const mutated = new Map();                            // column → { from, t0 }
+    let event = null, nextAt = 4, last = 0;
+
+    function mutate(c, t) {
+      // sometimes the cell's repair machinery fixes an earlier mutation
+      if (mutated.size && Math.random() < 0.3) {
+        const [x, m] = [...mutated.entries()][Math.floor(Math.random() * mutated.size)];
+        const bad = baseAt(x);
+        bases[x] = m.from; mutated.delete(x);
+        event = { x, t0: t, repair: true, text: `DNA repair @ bp ${1000 + x}: ${bad}→${m.from} fixed ✓` };
+        return;
+      }
+      if (mutated.size >= 12) {                           // too many: roll back to the clean sequence
+        for (const [x, m] of mutated) bases[x] = m.from;
+        mutated.clear();
+        event = { x: -1, t0: t, repair: true, text: '>> genome restored from backup. phew.' };
+        return;
+      }
+      const cols = [];
+      for (let x = 2; x < c.cols - 2; x += 2) if (!mutated.has(x)) cols.push(x);
+      const x = cols[Math.floor(Math.random() * cols.length)];
+      const from = baseAt(x);
+      const to = pick('ATGC'.replace(from, '').split(''));
+      bases[x] = to;
+      mutated.set(x, { from, t0: t });
+      const kind = !PURINE[from] === !PURINE[to] ? 'transition' : 'transversion';
+      event = { x, t0: t, text: `!! mutation @ bp ${1000 + x}: ${from}→${to} (${kind})` };
+    }
+
     return (c, t) => {
-      const rows = Math.min(c.rows, 11) | 1;
-      const oy = Math.floor((c.rows - rows) / 2);
+      if (t < last) nextAt = t + 4;                       // clock restarted
+      last = t;
+      if (t >= nextAt) { mutate(c, t); nextAt = t + 6 + Math.random() * 6; }
+
+      const rows = Math.min(c.rows - 2, 11) | 1;          // leave a row above (marker) and below (message)
+      const oy = Math.max(1, Math.floor((c.rows - rows) / 2));
+      const flashing = event && t - event.t0 < 3.5;
+      const blinkOn = Math.floor(t * 4) % 2 === 0;
+
       for (let x = 0; x < c.cols; x++) {
         const ph = x * 0.21 + t * 0.9;
         const frontA = Math.cos(ph) > 0;
@@ -59,11 +97,20 @@ window.LAB = window.LAB || {};
         c.put(frontA ? 0 : 2, x, oy + yb, '█');
         if (x % 2 === 0 && Math.abs(ya - yb) > 2) {
           const top = Math.min(ya, yb), bot = Math.max(ya, yb);
-          c.put(1, x, oy + top + 1, base(x));
-          c.put(1, x, oy + bot - 1, PAIR[base(x)]);
-          for (let y = top + 2; y < bot - 1; y++) c.put(1, x, oy + y, '│');
+          const b = baseAt(x);
+          const isNew = flashing && event.x === x && !event.repair;
+          const hot = mutated.has(x);                     // mutated bases stay bold
+          const l = hot ? 2 : 1;
+          c.put(l, x, oy + top + 1, isNew && !blinkOn ? '█' : b);
+          c.put(l, x, oy + bot - 1, isNew && !blinkOn ? '█' : PAIR[b]);
+          for (let y = top + 2; y < bot - 1; y++) c.put(l, x, oy + y, hot ? '┆' : '│');
         }
       }
+
+      // marker above the changed base pair, and the message underneath
+      if (flashing && event.x >= 0) c.put(2, event.x, oy - 1, event.repair ? '✓' : blinkOn ? '▼' : '▽');
+      const msg = flashing ? event.text : `mutations: ${mutated.size}`;
+      c.text(flashing ? 2 : 1, Math.max(0, c.cols - msg.length - 1), c.rows - 1, msg);
     };
   }
 
@@ -522,7 +569,7 @@ window.LAB = window.LAB || {};
     // size = character size compared with normal text (smaller = finer drawing)
     monday:    { cmd: 'drugs.sh --float',          note: '// no labels. name them all.',      canvas: true, pixel: true, make: drugs2d },
     tuesday:   { cmd: 'protein.sh --cartoon',      note: '// proteins from our lab, via the PDB', canvas: true, pixel: true, make: proteins3d },
-    wednesday: { cmd: 'dna.sh --spin --forever',   note: "// 5'→3', no looking back",         size: 1.1, make: dna },
+    wednesday: { cmd: 'dna.sh --spin --mutate',    note: "// 5'→3', mistakes included",         size: 1.1, make: dna },
     thursday:  { cmd: 'culture.sh --grow',         note: '// feed them before the weekend',   size: 1.0, make: culture },
     friday:    { cmd: 'train.py --epochs=inf',     note: '// model predicts: weekend',        size: 1.0, make: neural },
     saturday:  { cmd: 'virus.sh --spread',         note: '// contained. probably.',          size: 1.0, make: virus },

@@ -205,6 +205,12 @@ LAB.createDemoBackend = function () {
 
     /* everyone (including pending / inactive), without PIN data */
     async members() { return db.members.map(publicMember); },
+    async setupNeeded() { return false; },
+    /* admin list: everyone, with live status */
+    async adminMembers(session) {
+      requireAdmin(session);
+      return db.members.map((m) => ({ ...publicMember(m), state: { ...db.status[m.id] } }));
+    },
     async statusOf(id) { const s = db.status[id]; return { ...s }; },
 
     /* new member asks to join; an admin must approve before they can check in */

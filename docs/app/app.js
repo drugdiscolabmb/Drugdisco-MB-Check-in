@@ -3,11 +3,11 @@
  * Screens:  home (pick your name) → PIN → check in / update feeling / check out
  *           sign up (waits for admin approval) · change PIN · admin panel
  *
- * All data goes through `api` (js/backend-demo.js for now). When the real
- * database is connected, only that file changes — not this one.
+ * All data goes through `api`: the real database (js/backend-supabase.js) when
+ * config.js has the Supabase keys, otherwise demo data (js/backend-demo.js).
  */
 (function () {
-  const api = LAB.createDemoBackend();
+  const api = LAB.createBackend();
   const CFG = LAB.CONFIG || {};
   const FEELINGS = CFG.feelings || ['🙂'];
   const LAST_USER = 'ddl-last-user';
@@ -92,7 +92,16 @@
 
   /* ══ HOME: who are you? ═══════════════════════════════════════ */
   async function home() {
-    const all = await api.members();
+    let all;
+    try {
+      if (await api.setupNeeded()) return firstAdmin();
+      all = await api.members();
+    } catch (e) {
+      show(prompt('$ connect --db'), el('h1', { class: 'big' }, "can't reach the lab database"),
+        el('div', { class: 'msg err' }, e.message),
+        el('button', { class: 'btn primary', onclick: home }, '⟲ try again'));
+      return;
+    }
     const members = all.filter((m) => m.status === 'active').sort((a, b) => a.nickname.localeCompare(b.nickname));
     const status = {};
     for (const m of members) status[m.id] = await api.statusOf(m.id);
@@ -109,7 +118,7 @@
 
     const list = el('ul', { class: 'members' });
     const draw = (q = '') => {
-      const f = members.filter((m) => !q || m.nickname.includes(q.toLowerCase()) || m.full_name.toLowerCase().includes(q.toLowerCase()));
+      const f = members.filter((m) => !q || m.nickname.includes(q.toLowerCase()) || (m.full_name || '').toLowerCase().includes(q.toLowerCase()));
       list.replaceChildren(...(f.length ? f.map((m) => row(m)) : [el('li', { class: 'empty' }, '> no one by that name. new here? sign up below.')]));
     };
     draw();
@@ -372,8 +381,12 @@
     cleanup = guardIdle();
   }
 
+  /* ══ one-time setup: the very first admin (only while the database is empty) ══ */
+  function firstAdmin() { signUp(true); }
+
   /* ══ sign up ══════════════════════════════════════════════════ */
-  function signUp() {
+  function signUp(first = false) {
+    first = first === true;
     const msg = el('div', { class: 'msg', role: 'status' });
     const f = {
       full: el('input', { type: 'text', autocomplete: 'name', placeholder: 'e.g. Somchai Jaidee' }),
@@ -390,12 +403,22 @@
       e.preventDefault();
       if (f.pin.value !== f.pin2.value) { msg.className = 'msg err'; msg.textContent = "PINs don't match"; return; }
       try {
-        const m = await api.signUp({ full_name: f.full.value, nickname: f.nick.value, position: f.pos.value, pin: f.pin.value, initials: ini.value(), avatar: builder.value() });
+        const data = { full_name: f.full.value, nickname: f.nick.value, position: f.pos.value, pin: f.pin.value, initials: ini.value(), avatar: builder.value() };
+        if (first) {
+          const m = await api.setupFirstAdmin(data);
+          remember(m.id);
+          done([`$ init --admin ${m.nickname}`, '> creating lab database .. <ok>OK</ok>', '> hashing PIN ........... <ok>OK</ok>',
+            `<hl>✓ you're the first admin, ${m.nickname}</hl>`, '> others can now sign up; approve them in ⚙ admin.'], 7);
+          return;
+        }
+        const m = await api.signUp(data);
         done([`$ useradd ${m.nickname}`, '> request saved ......... <ok>OK</ok>', '<hl>✓ request sent</hl>',
           '> an admin will approve you soon.', '> then pick your name and use your PIN.'], 7);
       } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
     };
-    show(back(), prompt('$ useradd --new'), el('h1', { class: 'big' }, 'join the lab board'),
+    show(first ? null : back(), prompt(first ? '$ init --first-admin' : '$ useradd --new'),
+      el('h1', { class: 'big' }, first ? 'set up the lab board' : 'join the lab board'),
+      first ? el('p', { class: 'small muted' }, 'the database is empty. the first person to sign up here becomes the admin and is active right away. this screen never shows again.') : null,
       el('form', { onsubmit: submit, novalidate: true },
         field('> full_name', f.full),
         field('> nickname', f.nick, 'shown on the wall screen · 2–12 letters/numbers'),
@@ -405,8 +428,8 @@
         field('> PIN (6 digits)', f.pin, 'you type this every time you check in'),
         field('> confirm PIN', f.pin2),
         msg,
-        el('button', { class: 'btn primary', type: 'submit' }, 'request to join')),
-      el('p', { class: 'small muted' }, 'an admin approves new members before they appear on the wall.'));
+        el('button', { class: 'btn primary', type: 'submit' }, first ? 'create admin' : 'request to join')),
+      first ? null : el('p', { class: 'small muted' }, 'an admin approves new members before they appear on the wall.'));
   }
 
   /* ══ admin ════════════════════════════════════════════════════ */
@@ -441,7 +464,9 @@
   }
 
   async function adminPanel(session, tab) {
-    const all = await api.members();
+    let all;
+    try { all = await api.adminMembers(session); }
+    catch (e) { show(back(adminLogin), el('div', { class: 'msg err' }, e.message)); return; }
     const pending = all.filter((m) => m.status === 'pending');
     const others = all.filter((m) => m.status !== 'pending').sort((a, b) => a.nickname.localeCompare(b.nickname));
     const msg = el('div', { class: 'msg', role: 'status' });
@@ -452,14 +477,13 @@
 
     const pendingCards = pending.length ? pending.map((m) => el('div', { class: 'card' },
       el('div', { class: 'nick' }, m.nickname, el('span', { class: 'at' }, '@lab')),
-      el('div', { class: 'meta' }, `${m.full_name} · ${m.position} · asked ${hhmm(m.created_at)} ${new Date(m.created_at).toLocaleDateString()}`),
+      el('div', { class: 'meta' }, `${m.full_name} · ${m.position} · initials ${m.initials} · asked ${hhmm(m.created_at)} ${new Date(m.created_at).toLocaleDateString()}`),
       el('div', { class: 'chips' },
         el('button', { class: 'chip', onclick: () => act(() => api.approve(session, m.id), `✓ ${m.nickname} approved`) }, '✓ approve'),
         armed('✕ reject', () => act(() => api.reject(session, m.id), `${m.nickname}'s request removed`)))))
       : [el('div', { class: 'empty' }, '> no requests waiting.')];
 
-    const statusAll = {};
-    for (const m of others) statusAll[m.id] = await api.statusOf(m.id);
+    const statusAll = Object.fromEntries(others.map((m) => [m.id, m.state]));
     const memberCards = others.map((m) => {
       const s = statusAll[m.id], me = m.id === session.id;
       const pinBox = el('div');

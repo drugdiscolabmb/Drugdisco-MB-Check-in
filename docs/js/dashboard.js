@@ -537,7 +537,7 @@
   window.addEventListener('resize', layout);
   if (document.fonts) document.fonts.ready.then(() => { measureChar(); layout(); });
 
-  const source = LAB.createDemoBackend();  // demo data in this browser; later: the real database
+  const source = LAB.createBackend();  // real database if config.js has the Supabase keys, otherwise demo data
   source.subscribe(render);
   boot(lastState ? lastState.members.filter((m) => m.status === 'active').length : 0);
 })();

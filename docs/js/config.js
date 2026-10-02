@@ -7,6 +7,13 @@ window.LAB = window.LAB || {};
 
 LAB.CONFIG = {
 
+  /* The real lab database (Supabase → Project Settings → API).
+     Leave both empty to run on demo data stored in the browser.
+     The publishable key (sb_publishable_…) is meant to be public — it is
+     safe here. NEVER put the "secret" key (sb_secret_…) in this file. */
+  supabaseUrl: 'https://bxithdzaeedncgezywis.supabase.co',
+  supabaseKey: 'sb_publishable_H__sVyAdMk6Qhn9dd4F8Dg_waWBrSKr',
+
   /* Animations and effects (boot screen, glitch, scan line, typing…).
      Set to false if the Raspberry Pi ever feels slow or choppy. */
   effects: true,

@@ -36,3 +36,7 @@ The dashboard currently runs on **demo data** (fake members, marked `DEMO DATA` 
 The real database comes next.
 
 > ⚠️ This repository is public. Never put passwords, PINs or secret keys in these files.
+
+## Real database
+
+To switch from demo data to the shared lab database, follow `supabase/SUPABASE_SETUP.md` (create a free Supabase project, run `supabase/setup.sql`, paste the URL + publishable key into `docs/js/config.js`). The first person to open the app afterwards sets up the first admin.

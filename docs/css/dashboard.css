@@ -91,6 +91,7 @@ body.hide-cursor, body.hide-cursor * { cursor: none !important; }
   font-weight: 600;
   letter-spacing: .02em;
 }
+.logo { width: 1.7em; height: 1.7em; flex: none; image-rendering: pixelated; border-radius: .3em; box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
 .dots { display: flex; gap: .4em; }
 .dots span { width: .75em; height: .75em; border-radius: 50%; background: rgba(255,255,255,.9); }
 .dots span:nth-child(2) { background: rgba(255,255,255,.6); }

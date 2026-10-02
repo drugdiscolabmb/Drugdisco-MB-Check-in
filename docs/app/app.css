@@ -56,6 +56,7 @@ button { cursor: pointer; }
   font-size: .78em;
   font-weight: 600;
 }
+.logo { width: 1.6em; height: 1.6em; flex: none; image-rendering: pixelated; border-radius: .3em; box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
 .dots { display: flex; gap: .35em; }
 .dots span { width: .7em; height: .7em; border-radius: 50%; background: rgba(255,255,255,.9); }
 .dots span:nth-child(2) { background: rgba(255,255,255,.6); }

@@ -53,7 +53,18 @@ You'll do this once. It takes about 1.5–2 hours, most of it waiting for downlo
 
 ---
 
-## Part 3 — Connect to the university Wi-Fi (web login page)
+## Part 3 — Get the Pi online
+
+### Option A — LAN cable (recommended, more stable)
+
+1. Plug the LAN cable into the Pi's network port (next to the USB ports). Do this before or after power — either is fine.
+2. Wait ~30 seconds. The network icon in the top-right should change to two arrows (wired connection).
+3. Open the web browser and go to `https://www.google.com`.
+   - **Loads?** You're online — skip to Part 4.
+   - **University login page appears instead?** The LAN also needs a login. Log in with your university account, then test Google again.
+   - **Nothing loads at all?** The wall socket may be inactive or need the Pi registered. Get the Pi's wired address with `cat /sys/class/net/eth0/address` and ask IT to activate the socket for it.
+
+### Option B — University Wi-Fi (web login page)
 
 1. Click the **network icon** in the top-right of the taskbar.
 2. Click the university Wi-Fi network name.
@@ -105,8 +116,7 @@ You'll do this once. It takes about 1.5–2 hours, most of it waiting for downlo
    sudo reboot
    ```
 
-✅ **Checkpoint:** after the desktop appears, wait ~15 seconds. A web page with the **Bangkok clock** (time.is) opens full-screen, with no browser bars.
-That's a test page — later we swap it for the real lab dashboard.
+✅ **Checkpoint:** after the desktop appears, wait ~15 seconds. The **lab wall screen** opens full-screen, with no browser bars.
 
 **What the setup script did for you:**
 - Installs a colour emoji font, so the members' feeling emojis show properly
@@ -142,7 +152,7 @@ The dashboard is designed for a monitor standing **upright**.
 | Bring the full-screen page back | Restart: open Terminal → `sudo reboot` |
 | Change the web page shown | Terminal → `nano ~/lab-kiosk/kiosk.conf` → edit the line `URL="..."` → press `Ctrl`+`O`, `Enter` to save, `Ctrl`+`X` to exit → `sudo reboot` |
 | Turn the Pi off safely | Terminal → `sudo shutdown now`, wait until the green light stops blinking, then unplug. **Don't just pull the plug** — it can corrupt the SD card. |
-| Find the Pi's Wi-Fi hardware address (MAC) | Terminal → `cat /sys/class/net/wlan0/address` |
+| Find the Pi's hardware address (MAC) | LAN: `cat /sys/class/net/eth0/address` · Wi-Fi: `cat /sys/class/net/wlan0/address` |
 
 ---
 

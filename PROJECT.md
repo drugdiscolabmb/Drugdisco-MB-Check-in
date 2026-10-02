@@ -21,10 +21,10 @@ The aesthetic is **CMD / terminal style** with soft day-based color themes (not 
 1. Enter full name
 2. Enter nickname (shown on dashboard)
 3. Select position from fixed list
-4. Set a 4-digit PIN
+4. Set a 6-digit PIN
 
 **Position list (fixed dropdown):**
-`PI` · `Postdoc` · `Researcher` · `PhD Student` · `Master's Student` · `Research Assistant` · `Visitor`
+`PI` · `Postdoc` · `Researcher` · `PhD Student` · `Master's Student` · `Research Assistant` · `Intern` · `Visitor`
 
 ### Daily check-in flow
 1. Open app on phone
@@ -34,7 +34,7 @@ The aesthetic is **CMD / terminal style** with soft day-based color themes (not 
 5. Checked in ✓
 
 ### Design decisions
-- PIN is 4 digits — fast and familiar
+- PIN is 6 digits (decided Oct 2026) — still quick on a keypad, much harder to guess
 - No email/password dependency
 - Anyone who knows your PIN can check you in — intentional, useful in a lab context
 - This is a **presence tracker**, not a strict audit system
@@ -205,8 +205,8 @@ People will forget to check out. Options:
 
 ## Open Questions / Next Steps
 
-- [ ] Design mobile check-in UI (terminal aesthetic, PIN pad, feeling picker)
-- [ ] Decide: open registration or admin-invite only?
+- [x] Design mobile check-in UI (terminal aesthetic, PIN pad, feeling picker) — `docs/app/`, demo data for now
+- [x] Decide: open registration or admin-invite only? → **sign up in the app + admin approves**
 - [ ] Decide: emoji set — curated list or free picker?
 - [ ] Decide: should the feeling update mid-session write to the event log or just update status silently?
 - [ ] Raspberry Pi setup — kiosk mode config, auto-start on boot, screen timeout behaviour

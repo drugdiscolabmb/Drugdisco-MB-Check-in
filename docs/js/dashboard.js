@@ -13,15 +13,7 @@
   const FX = CFG.effects !== false && params.get('fx') !== '0';
   if (!FX) document.documentElement.classList.add('no-fx');
 
-  const POSITION_TAG = {
-    'PI': 'pi',
-    'Postdoc': 'postdoc',
-    'Researcher': 'researcher',
-    'PhD Student': 'phd_student',
-    "Master's Student": 'masters_student',
-    'Research Assistant': 'research_asst',
-    'Visitor': 'visitor',
-  };
+  const POSITION_TAG = Object.fromEntries(((LAB.CONFIG || {}).positions || []).map((p) => [p.name, p.tag]));   // from config.js
   const WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -201,15 +193,21 @@
   }
 
   function meterText(from, now) {
-    const full = (CFG.fullDayHours || 9) * 3600000;
+    const full = (CFG.fullDayHours || 8) * 3600000;
     const n = Math.max(0, Math.min(10, Math.round(((now - from) / full) * 10)));
     return [document.createTextNode('█'.repeat(n)), el('span', 'rest', '░'.repeat(10 - n))];
   }
 
   function updateCard(card, m, s, i, now) {
     const r = card._r;
-    r.idx.textContent = pad2(i + 1);
-    r.avatar.textContent = initials(m.nickname);
+    r.idx.textContent = m.initials || initials(m.nickname);       // their initials instead of 01, 02, …
+    if (m.avatar && LAB.AVATAR) {                                 // pixel face, or initials if they have none
+      if (r.avatar.dataset.code !== m.avatar) { r.avatar.innerHTML = LAB.AVATAR.svg(m.avatar); r.avatar.dataset.code = m.avatar; }
+      r.avatar.classList.add('face');
+    } else {
+      r.avatar.textContent = m.initials || initials(m.nickname);
+      r.avatar.classList.remove('face'); delete r.avatar.dataset.code;
+    }
     r.nick.replaceChildren(m.nickname, el('span', 'at', '@lab'));
     r.pos.textContent = `[${POSITION_TAG[m.position] || 'member'}]`;
     r.since.textContent = `since ${hhmm(s.last_check_in)}`;
@@ -308,8 +306,7 @@
       const s = st(m);
       const left = sameDay(s.last_check_out, now) ? `left ${hhmm(s.last_check_out)}` : '-- not in today';
       return el('div', 'out-row',
-        el('span', 'idx', pad2(i + 1)),
-        el('span', 'ini', initials(m.nickname)),
+        el('span', 'ini', m.initials || initials(m.nickname)),
         el('span', 'nick', m.nickname, el('span', 'at', '@lab')),
         el('span', 'pos', `[${POSITION_TAG[m.position] || 'member'}]`),
         el('span', 'left', left));
@@ -540,7 +537,7 @@
   window.addEventListener('resize', layout);
   if (document.fonts) document.fonts.ready.then(() => { measureChar(); layout(); });
 
-  const source = LAB.createDemoSource();   // later: the real database source
+  const source = LAB.createDemoBackend();  // demo data in this browser; later: the real database
   source.subscribe(render);
   boot(lastState ? lastState.members.filter((m) => m.status === 'active').length : 0);
 })();

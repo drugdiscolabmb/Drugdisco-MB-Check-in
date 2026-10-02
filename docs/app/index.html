@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2f6fb5">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Lab check-in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <div class="dots"><span></span><span></span><span></span></div>
+      <div class="title">DRUG_DISCO_LAB — checkin.sh</div>
+      <span class="demo-tag" id="demoTag" hidden>DEMO</span>
+    </header>
+
+    <!-- every screen is drawn in here by app.js -->
+    <main class="view" id="view" aria-live="polite"></main>
+
+    <footer class="footer">
+      <span id="dayLine">// presence.sh</span>
+      <a href="../" class="link">wall dashboard ↗</a>
+    </footer>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/themes.js"></script>
+  <script src="../js/avatar.js"></script>
+  <script src="../js/backend-demo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

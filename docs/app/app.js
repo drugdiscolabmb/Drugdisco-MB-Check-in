@@ -164,7 +164,12 @@
         busy = false;
       } else if (k !== 'del' && k !== 'clr') { msg.className = 'msg'; msg.textContent = ''; }
     }
-    const key = (label, k, cls = 'key', aria) => el('button', { class: cls, 'aria-label': aria || label, onclick: () => press(k) }, label);
+    const key = (label, k, cls = 'key', aria) => {
+      const b = el('button', { class: cls, 'aria-label': aria || label, onclick: () => press(k) }, label);
+      // phones: handle the tap ourselves so two quick taps on the same key never zoom the page
+      b.addEventListener('touchend', (e) => { e.preventDefault(); press(k); }, { passive: false });
+      return b;
+    };
     const pad = el('div', { class: 'keypad' },
       ...'123456789'.split('').map((d) => key(d, d)),
       key('clear', 'clr', 'key ghost'), key('0', '0'), key('⌫', 'del', 'key ghost', 'delete'));

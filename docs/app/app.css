@@ -184,6 +184,9 @@ input::placeholder { color: #9aa3ad; }
 .msg { min-height: 1.5em; margin: .3em 0 .6em; text-align: center; font-size: .9em; }
 .msg.err { color: var(--danger); font-weight: 600; }
 .msg.ok { color: var(--ok); font-weight: 600; }
+/* phones: no double-tap zoom when tapping the same key twice (e.g. PIN 113333) */
+html, body, button, a, input, select, label { touch-action: manipulation; }
+.keypad, .key { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6em; max-width: 340px; margin: 0 auto; }
 .key {
   min-height: 3.6em;

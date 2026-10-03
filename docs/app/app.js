@@ -17,12 +17,12 @@
 
   const POSITION_TAG = Object.fromEntries(((LAB.CONFIG || {}).positions || []).map((p) => [p.name, p.tag]));   // from config.js
   const BYE = [
-    'go rest. the cells will be fine.', "don't forget your samples in the incubator.",
-    'lab coat off, brain off.', 'see you tomorrow (probably).', 'good work today.',
-    "the PCR can finish without you.", 'remember to drink water.',
+    'go rest. the GPUs will be fine.', "don't forget to save your notebook.",
+    'laptop closed, brain off.', 'see you tomorrow (probably).', 'good work today.',
+    "the simulation can finish without you.", 'remember to drink water.',
   ];
   const HELLO = [
-    "let's get some data.", 'the pipettes missed you.', 'may your gels be straight.',
+    "let's get some data.", 'the GPUs missed you.', 'may your loss go down.',
     'coffee first, science second.', 'today is a good day for results.', 'p < 0.05 vibes only.',
   ];
 

@@ -19,7 +19,8 @@ LAB.CONFIG = {
   effects: true,
 
   /* Emoji choices members can pick as their "feeling" when checking in. */
-  feelings: ['☕', '🔥', '🧪', '🧫', '💻', '📚', '🎯', '💪', '🙂', '😴', '🤯', '🥲', '🎉', '🍜'],
+  feelings: ['☕', '🔥', '🧪', '🧫', '💻', '📚', '🎯', '💪', '🙂', '😴', '🤯', '🥲', '🎉', '🍜',
+             '🖥️', '💾', '🤖', '🐛', '📊', '🧬', '⏳'],
 
   /* Demo mode only: make random fake check-ins every 90 s so the wall looks
      alive. Leave false while testing the check-in app. */

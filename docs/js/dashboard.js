@@ -14,6 +14,26 @@
   if (!FX) document.documentElement.classList.add('no-fx');
 
   const POSITION_TAG = Object.fromEntries(((LAB.CONFIG || {}).positions || []).map((p) => [p.name, p.tag]));   // from config.js
+
+  /* shown on the wall when nobody is checked in (rotates every 10 min) — add your own */
+  const EMPTY_MSGS = [
+    "lab is empty. idle GPUs are sad GPUs.",
+    "lab is empty. the loss won't minimize itself.",
+    "lab is empty. the MD simulation is still running. probably.",
+    "lab is empty. first one in picks the music.",
+    "lab is empty. first one in makes the coffee.",
+    "lab is empty. the GPUs are bored. give them a job.",
+    "lab is empty. the data won't analyze itself.",
+    "lab is empty. the molecules are docking without you.",
+    "0 humans detected. the cluster is in charge now.",
+    "lab is empty. n = 0. we need a bigger sample size.",
+    "lab is empty. be today's first data point.",
+    "lab is empty. great results start with showing up.",
+    "lab is empty. the proteins are folding on their own.",
+    "lab is empty. somewhere, a reviewer is waiting.",
+    "lab is empty. the job queue is waiting for you.",
+    "lab is empty. no one to blame for the bug yet.",
+  ];
   const WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -299,6 +319,10 @@
 
     $('inHead').textContent = `// members :: status=IN [${ins.length}]`;
     $('inEmpty').hidden = ins.length > 0;
+    if (!ins.length) {                                   // a new joke every 10 minutes while nobody is in
+      const msg = EMPTY_MSGS[Math.floor(Date.now() / 600000) % EMPTY_MSGS.length];
+      if ($('emptyMsg').textContent !== msg) $('emptyMsg').textContent = msg;
+    }
     renderIn(ins, st, now);
 
     $('outHead').textContent = `// members :: status=OUT [${outs.length}]`;

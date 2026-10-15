@@ -371,27 +371,10 @@ body.hide-cursor, body.hide-cursor * { cursor: none !important; }
 .out-row .pos { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }   /* shrinks first */
 .out-row .left { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }   /* always visible */
 
-/* WFH: a working status like IN — same colours, compact rows, dashed edge */
+/* WFH: same cards as IN, with a dashed edge and badge */
 .wfh-head { color: var(--accent-ink); }
-.wfh-grid { opacity: 1; grid-template-columns: minmax(0, 1fr); gap: .35em; }
-.wfh-row {
-  align-items: center;
-  padding: .35em .8em .35em .65em;
-  border-left: 4px dashed var(--accent);
-  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface));
-  font-size: 1em;
-}
-.wfh-row .ini { color: var(--accent-ink); }
-.wfh-row .nick { font-weight: 800; color: var(--ink); }
-.wfh-row .pos { color: var(--muted); }
-.wfh-row .emo { font-size: .95em; }
-.wfh-row .avatar.mini { width: 1.9em; height: 1.9em; font-size: .7em; align-self: center; }
-.wfh-row .avatar.mini.face { font-size: 1em; }
-.wfh-row .left { color: var(--accent-ink); font-weight: 600; }
-.wfh-row .wbadge {
-  padding: .05em .5em; border: 1px dashed var(--accent); color: var(--accent-ink);
-  background: var(--surface); font-size: .8em; font-weight: 800; letter-spacing: .05em;
-}
+.card.wfh { border-left-style: dashed; }
+.card.wfh .badge { border-style: dashed; }
 .stat-wfh .v { color: var(--accent-ink); }
 .empty { color: var(--muted); padding: .4em 0 .2em; }
 

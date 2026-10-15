@@ -180,11 +180,12 @@
   }
 
   /* ── member cards ──────────────────────────────────────── */
-  const cards = new Map();          // member id → card element (kept between redraws)
+  const cardsIn = new Map();        // member id → card element (kept between redraws)
+  const wfhCards = new Map();       // same, for people working from home
   let firstRender = true;
   const introDelay = FX ? BOOT_MS / 1000 : 0;
 
-  function buildCard() {
+  function buildCard(kind = 'in') {
     const r = {
       idx: el('span', 'idx'),
       avatar: el('span', 'avatar'),
@@ -201,7 +202,9 @@
         el('div', 'who-top', r.nick, r.pos),
         el('div', 'who-mid', r.since, r.meter, r.dur),
         r.feel),
-      el('span', 'badge', 'IN'));
+      el('span', 'badge', kind === 'wfh' ? 'WFH' : 'IN'));
+    if (kind === 'wfh') card.classList.add('wfh');
+    card._kind = kind;
     card._r = r;
     card.addEventListener('animationend', (e) => {
       if (e.target === card && (e.animationName === 'flash-bg' || e.animationName === 'slide-in')) {
@@ -218,6 +221,24 @@
     return [document.createTextNode('█'.repeat(n)), el('span', 'rest', '░'.repeat(10 - n))];
   }
 
+  /* total time worked today (lab + WFH together) from today's check-in/out log,
+     so switching lab ⇄ home doesn't reset the bar */
+  function workedToday(events, now) {
+    const byId = new Map();
+    const evs = [...events].sort((a, b) => (a.timestamp - b.timestamp) ||
+      ((a.type === 'check_out' ? 0 : 1) - (b.type === 'check_out' ? 0 : 1)));   // same moment: out before in
+    for (const e of evs) {
+      const w = byId.get(e.member_id) || { ms: 0, open: null };
+      if (e.type === 'check_in' && w.open == null) w.open = +e.timestamp;
+      else if (e.type === 'check_out' && w.open != null) { w.ms += +e.timestamp - w.open; w.open = null; }
+      byId.set(e.member_id, w);
+    }
+    const out = new Map();
+    for (const [id, w] of byId) out.set(id, w.ms + (w.open != null ? +now - w.open : 0));
+    return out;
+  }
+  let worked = new Map();
+
   function updateCard(card, m, s, i, now) {
     const r = card._r;
     r.idx.textContent = m.initials || initials(m.nickname);       // their initials instead of 01, 02, …
@@ -228,11 +249,14 @@
       r.avatar.textContent = m.initials || initials(m.nickname);
       r.avatar.classList.remove('face'); delete r.avatar.dataset.code;
     }
-    r.nick.replaceChildren(m.nickname, el('span', 'at', '@lab'));
+    r.nick.replaceChildren(m.nickname, el('span', 'at', card._kind === 'wfh' ? '@home' : '@lab'));
     r.pos.textContent = `[${POSITION_TAG[m.position] || 'member'}]`;
     r.since.textContent = `since ${hhmm(s.last_check_in)}`;
-    r.dur.textContent = duration(s.last_check_in, now);
-    r.meter.replaceChildren(...meterText(s.last_check_in, now));
+    // bar + hours = all of today (lab and home); "since" = when they started here
+    const total = Math.max(worked.get(m.id) || 0, now - s.last_check_in);
+    const start = new Date(now - total);
+    r.dur.textContent = duration(start, now);
+    r.meter.replaceChildren(...meterText(start, now));
 
     const feelKey = `${s.feeling_emoji || ''}|${s.feeling_text || ''}`;
     if (card._feel !== feelKey) {
@@ -244,8 +268,9 @@
     }
   }
 
-  function renderIn(ins, st, now) {
-    const list = $('inList');
+  function renderIn(ins, st, now, kind = 'in') {
+    const list = $(kind === 'wfh' ? 'wfhList' : 'inList');
+    const cards = kind === 'wfh' ? wfhCards : cardsIn;
     list.classList.toggle('two', ins.length > 8);
     const keep = new Set();
     let ref = list.firstElementChild;
@@ -253,7 +278,7 @@
     ins.forEach((m, i) => {
       let card = cards.get(m.id);
       const isNew = !card;
-      if (isNew) { card = buildCard(); cards.set(m.id, card); }
+      if (isNew) { card = buildCard(kind); cards.set(m.id, card); }
       updateCard(card, m, st(m), i, now);
       keep.add(m.id);
 
@@ -268,7 +293,7 @@
           card.style.animationDelay = `${introDelay + i * 0.12}s`;
         } else {
           card.classList.add('enter');
-          const hello = el('span', 'hello', '>> just checked in');
+          const hello = el('span', 'hello', kind === 'wfh' ? '>> working from home' : '>> just checked in');
           card.append(hello);
           setTimeout(() => hello.remove(), 5200);
         }
@@ -328,24 +353,13 @@
       const msg = EMPTY_MSGS[Math.floor(Date.now() / 600000) % EMPTY_MSGS.length];
       if ($('emptyMsg').textContent !== msg) $('emptyMsg').textContent = msg;
     }
+    worked = workedToday(state.events || [], now);
     renderIn(ins, st, now);
 
-    $('wfhHead').hidden = $('wfhList').hidden = !homes.length;
+    $('wfhHead').hidden = !homes.length;
     $('wfhHead').textContent = `// members :: status=WFH [${homes.length}]`;
-    $('wfhList').replaceChildren(...homes.map((m) => {
-      const s = st(m);
-      const av = el('span', 'avatar mini');                       // pixel face, or initials if none
-      if (m.avatar && LAB.AVATAR) { av.innerHTML = LAB.AVATAR.svg(m.avatar); av.classList.add('face'); }
-      else av.textContent = m.initials || initials(m.nickname);
-      return el('div', 'out-row wfh-row',
-        el('span', 'ini', m.initials || initials(m.nickname)),
-        av,
-        el('span', 'nick', m.nickname, el('span', 'at', '@home')),
-        s.feeling_emoji ? el('span', 'emo', s.feeling_emoji) : null,
-        el('span', 'pos', `[${POSITION_TAG[m.position] || 'member'}]`),
-        el('span', 'left', `${hhmm(s.last_check_in)} · ${duration(s.last_check_in, now)}`),
-        el('span', 'wbadge', 'WFH'));
-    }));
+    renderIn(homes, st, now, 'wfh');                     // same cards as IN: bar, feeling, avatar
+    $('wfhList').hidden = !$('wfhList').children.length;  // stays visible while a card animates out
 
     $('outHead').textContent = `// members :: status=OUT [${outs.length}]`;
     $('outList').replaceChildren(...outs.map((m, i) => {

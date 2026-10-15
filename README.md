@@ -36,9 +36,11 @@ Open the **check-in app** link above on your phone, then add it to your home scr
 
 | When | What to do |
 |---|---|
-| **Arriving** | Open the app → tap your name → type your PIN → (optional) pick a feeling and write a short status → **▶ CHECK IN** |
+| **Arriving at the lab** | Open the app → tap your name → type your PIN → (optional) pick a feeling and write a short status → **▶ CHECK IN · LAB** |
+| **Working from home** | Same steps, but tap **▶ WORK FROM HOME** |
+| **Moving between home and lab** | Your name → PIN → **⇄ switch to WFH** or **⇄ I came to the lab**. No need to check out first. |
 | **Mood changes** | Open the app → your name → PIN → pick a new feeling → **✎ update feeling** |
-| **Leaving** | Open the app → your name → PIN → **◀ CHECK OUT** |
+| **Done for the day** | Open the app → your name → PIN → **◀ CHECK OUT**. This works for lab and WFH. |
 
 The app remembers you, so your name is at the top under **continue as**.
 
@@ -57,7 +59,7 @@ After typing your PIN you'll also see:
 
 ## 5. The wall screen
 
-The screen by the lab door shows who's **IN** and who's **OUT** today:
+The screen by the lab door shows who's **IN** the lab, who's working from home (**WFH**), and who's **OUT** today:
 
 - Your **initials**, **avatar**, **nickname** and **position**.
 - The time you checked in, and a bar that fills up over an 8-hour day.

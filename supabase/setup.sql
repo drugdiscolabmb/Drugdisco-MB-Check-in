@@ -43,6 +43,11 @@ create table if not exists public.events (            -- every check-in / check-
 );
 create index if not exists events_ts_idx on public.events (ts);
 
+-- where people work: 'lab' or 'wfh' (work from home). Added later — these lines
+-- upgrade an existing database without touching its data.
+alter table public.events add column if not exists location text not null default 'lab';
+alter table public.status add column if not exists location text not null default 'lab';
+
 create table if not exists public.status (            -- live state, one row per member
   member_id       uuid primary key references public.members(id) on delete cascade,
   is_in           boolean not null default false,
@@ -79,7 +84,7 @@ declare r record; v_end timestamptz;
 begin
   for r in select * from status where is_in and last_check_in < _today_start() loop
     v_end := (date_trunc('day', r.last_check_in at time zone 'Asia/Bangkok') + interval '23 hours 59 minutes 59 seconds') at time zone 'Asia/Bangkok';
-    insert into events (member_id, type, ts, auto) values (r.member_id, 'check_out', v_end, true);
+    insert into events (member_id, type, ts, auto, location) values (r.member_id, 'check_out', v_end, true, r.location);
     update status set is_in = false, last_check_out = v_end, feeling_emoji = null, feeling_text = null where member_id = r.member_id;
   end loop;
   delete from admin_sessions where expires_at < now();
@@ -132,7 +137,7 @@ language sql immutable as $$ select nullif(left(btrim(coalesce(t, '')), n), '') 
 create or replace function public._status_json(p_id uuid) returns jsonb
 language sql security definer set search_path = public, extensions as $$
   select jsonb_build_object('is_in', is_in, 'last_check_in', last_check_in, 'last_check_out', last_check_out,
-                            'feeling_emoji', feeling_emoji, 'feeling_text', feeling_text)
+                            'feeling_emoji', feeling_emoji, 'feeling_text', feeling_text, 'location', location)
   from status where member_id = p_id
 $$;
 
@@ -166,7 +171,7 @@ begin
       from status s join members m on m.id = s.member_id where m.status = 'active'), '{}'::jsonb),
     'events', coalesce((select jsonb_agg(jsonb_build_object(
         'member_id', e.member_id, 'type', e.type, 'timestamp', e.ts,
-        'feeling_emoji', e.feeling_emoji, 'feeling_text', e.feeling_text) order by e.ts)
+        'feeling_emoji', e.feeling_emoji, 'feeling_text', e.feeling_text, 'location', e.location) order by e.ts)
       from events e join members m on m.id = e.member_id
       where e.ts >= _today_start() and m.status = 'active'), '[]'::jsonb),
     'setup_needed', not exists (select 1 from members));
@@ -214,16 +219,18 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
-create or replace function public.check_in(p_id uuid, p_pin text, p_emoji text default null, p_text text default null) returns jsonb
+drop function if exists public.check_in(uuid, text, text, text);   -- old version without location
+create or replace function public.check_in(p_id uuid, p_pin text, p_emoji text default null, p_text text default null, p_location text default 'lab') returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare err text; v_e text := _clean_text(p_emoji, 16); v_t text := _clean_text(p_text, 40);
+        v_loc text := case when p_location = 'wfh' then 'wfh' else 'lab' end;
 begin
   perform _housekeeping();
   err := _check_member(p_id, p_pin);
   if err is not null then return jsonb_build_object('ok', false, 'error', err); end if;
   if (select is_in from status where member_id = p_id) then return jsonb_build_object('ok', false, 'error', 'already checked in'); end if;
-  insert into events (member_id, type, feeling_emoji, feeling_text) values (p_id, 'check_in', v_e, v_t);
-  update status set is_in = true, last_check_in = now(), feeling_emoji = v_e, feeling_text = v_t where member_id = p_id;
+  insert into events (member_id, type, feeling_emoji, feeling_text, location) values (p_id, 'check_in', v_e, v_t, v_loc);
+  update status set is_in = true, last_check_in = now(), feeling_emoji = v_e, feeling_text = v_t, location = v_loc where member_id = p_id;
   return jsonb_build_object('ok', true, 'status', _status_json(p_id));
 end $$;
 
@@ -235,8 +242,25 @@ begin
   err := _check_member(p_id, p_pin);
   if err is not null then return jsonb_build_object('ok', false, 'error', err); end if;
   if not (select is_in from status where member_id = p_id) then return jsonb_build_object('ok', false, 'error', 'not checked in'); end if;
-  insert into events (member_id, type) values (p_id, 'check_out');
+  insert into events (member_id, type, location) values (p_id, 'check_out', (select location from status where member_id = p_id));
   update status set is_in = false, last_check_out = now(), feeling_emoji = null, feeling_text = null where member_id = p_id;
+  return jsonb_build_object('ok', true, 'status', _status_json(p_id));
+end $$;
+
+-- switch between lab and WFH without checking out (logged as check-out + check-in at the same moment)
+create or replace function public.switch_location(p_id uuid, p_pin text, p_location text) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare err text; s status; v_loc text := case when p_location = 'wfh' then 'wfh' else 'lab' end;
+begin
+  perform _housekeeping();
+  err := _check_member(p_id, p_pin);
+  if err is not null then return jsonb_build_object('ok', false, 'error', err); end if;
+  select * into s from status where member_id = p_id;
+  if not s.is_in then return jsonb_build_object('ok', false, 'error', 'check in first'); end if;
+  if s.location = v_loc then return jsonb_build_object('ok', false, 'error', 'already ' || case when v_loc = 'wfh' then 'working from home' else 'in the lab' end); end if;
+  insert into events (member_id, type, location) values (p_id, 'check_out', s.location);
+  insert into events (member_id, type, feeling_emoji, feeling_text, location) values (p_id, 'check_in', s.feeling_emoji, s.feeling_text, v_loc);
+  update status set location = v_loc, last_check_in = now() where member_id = p_id;
   return jsonb_build_object('ok', true, 'status', _status_json(p_id));
 end $$;
 
@@ -319,7 +343,7 @@ language plpgsql security definer set search_path = public, extensions as $$
 begin
   if _admin(p_token) is null then return jsonb_build_object('ok', false, 'error', 'please log in as admin again'); end if;
   if (select is_in from status where member_id = p_id) then
-    insert into events (member_id, type) values (p_id, 'check_out');
+    insert into events (member_id, type, location) values (p_id, 'check_out', (select location from status where member_id = p_id));
     update status set is_in = false, last_check_out = now(), feeling_emoji = null, feeling_text = null where member_id = p_id;
   end if;
   return jsonb_build_object('ok', true);
@@ -365,7 +389,7 @@ revoke execute on function public._today_start(), public._housekeeping(), public
 -- the website (anon / publishable key): only these
 grant execute on function public.board(), public.setup_first_admin(text, text, text, text, text, text),
   public.sign_up(text, text, text, text, text, text), public.verify(uuid, text),
-  public.check_in(uuid, text, text, text), public.check_out(uuid, text), public.set_feeling(uuid, text, text, text),
+  public.check_in(uuid, text, text, text, text), public.switch_location(uuid, text, text), public.check_out(uuid, text), public.set_feeling(uuid, text, text, text),
   public.set_profile(uuid, text, text, text), public.change_pin(uuid, text, text),
   public.admin_login(uuid, text), public.admin_members(uuid), public.admin_approve(uuid, uuid),
   public.admin_reject(uuid, uuid), public.admin_force_checkout(uuid, uuid), public.admin_set_active(uuid, uuid, boolean),

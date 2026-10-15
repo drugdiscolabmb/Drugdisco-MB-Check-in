@@ -63,7 +63,8 @@ LAB.createDemoBackend = function () {
         : { is_in: false, last_check_out: ts, feeling_emoji: null, feeling_text: null });
     };
     ev(290, 'm1', 'check_in', '☕', 'grant deadline this week');
-    ev(265, 'm2', 'check_in', '🔥', 'new results!');
+    ev(265, 'm2', 'check_in', '🛋️', 'writing from home');
+    if (d.status.m2.is_in) d.status.m2.location = 'wfh';
     ev(150, 'm1', 'check_out');
     ev(128, 'm5', 'check_in', '🧫', 'cells look happy today');
     ev(96, 'm1', 'check_in', '🎯', 'meetings all afternoon');
@@ -147,9 +148,10 @@ LAB.createDemoBackend = function () {
     emoji: f.emoji || null,
     text: (f.text || '').trim().slice(0, 40) || null,
   });
-  function addEvent(id, type, f = {}) {
+  function addEvent(id, type, f = {}, location) {
     const ts = Date.now();
-    db.events.push({ member_id: id, type, timestamp: ts, feeling_emoji: f.emoji || null, feeling_text: f.text || null });
+    location = location || (db.status[id] && db.status[id].location) || 'lab';
+    db.events.push({ member_id: id, type, timestamp: ts, feeling_emoji: f.emoji || null, feeling_text: f.text || null, location });
     return ts;
   }
   function requireAdmin(session) {
@@ -241,13 +243,14 @@ LAB.createDemoBackend = function () {
       return publicMember(m);
     },
 
-    async checkIn(id, pin, feeling) {
+    async checkIn(id, pin, feeling, location = 'lab') {
       await this.verify(id, pin);
       const s = db.status[id];
       if (s.is_in) throw new Error('already checked in');
       const f = cleanFeeling(feeling);
-      const ts = addEvent(id, 'check_in', f);
-      Object.assign(s, { is_in: true, last_check_in: ts, feeling_emoji: f.emoji, feeling_text: f.text });
+      const loc = location === 'wfh' ? 'wfh' : 'lab';
+      const ts = addEvent(id, 'check_in', f, loc);
+      Object.assign(s, { is_in: true, last_check_in: ts, feeling_emoji: f.emoji, feeling_text: f.text, location: loc });
       save();
       return { ...s };
     },
@@ -258,6 +261,20 @@ LAB.createDemoBackend = function () {
       if (!s.is_in) throw new Error('not checked in');
       const ts = addEvent(id, 'check_out');
       Object.assign(s, { is_in: false, last_check_out: ts, feeling_emoji: null, feeling_text: null });
+      save();
+      return { ...s };
+    },
+
+    /* lab ⇄ WFH without checking out (logged as check-out + check-in) */
+    async switchLocation(id, pin, location) {
+      await this.verify(id, pin);
+      const s = db.status[id];
+      if (!s.is_in) throw new Error('check in first');
+      const loc = location === 'wfh' ? 'wfh' : 'lab';
+      if ((s.location || 'lab') === loc) throw new Error(loc === 'wfh' ? 'already working from home' : 'already in the lab');
+      addEvent(id, 'check_out', {}, s.location || 'lab');
+      const ts = addEvent(id, 'check_in', { emoji: s.feeling_emoji, text: s.feeling_text }, loc);
+      Object.assign(s, { location: loc, last_check_in: ts });
       save();
       return { ...s };
     },

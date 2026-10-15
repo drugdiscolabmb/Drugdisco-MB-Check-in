@@ -301,9 +301,14 @@
     const active = state.members.filter((m) => m.status === 'active');
     const st = (m) => state.status[m.id] || {};
 
+    const wfh = (m) => st(m).location === 'wfh';                    // working from home
     const ins = active
-      .filter((m) => st(m).is_in)
+      .filter((m) => st(m).is_in && !wfh(m))
       .sort((a, b) => st(a).last_check_in - st(b).last_check_in);   // first arrival = 01
+
+    const homes = active
+      .filter((m) => st(m).is_in && wfh(m))
+      .sort((a, b) => st(a).last_check_in - st(b).last_check_in);
 
     const outs = active
       .filter((m) => !st(m).is_in)
@@ -314,8 +319,8 @@
       });
 
     setStat('statIn', pad2(ins.length));
+    setStat('statWfh', pad2(homes.length));
     setStat('statOut', pad2(outs.length));
-    setStat('statTotal', pad2(active.length));
 
     $('inHead').textContent = `// members :: status=IN [${ins.length}]`;
     $('inEmpty').hidden = ins.length > 0;
@@ -324,6 +329,19 @@
       if ($('emptyMsg').textContent !== msg) $('emptyMsg').textContent = msg;
     }
     renderIn(ins, st, now);
+
+    $('wfhHead').hidden = $('wfhList').hidden = !homes.length;
+    $('wfhHead').textContent = `// members :: status=WFH [${homes.length}]`;
+    $('wfhList').replaceChildren(...homes.map((m) => {
+      const s = st(m);
+      return el('div', 'out-row wfh-row',
+        el('span', 'ini', m.initials || initials(m.nickname)),
+        el('span', 'nick', m.nickname, el('span', 'at', '@home')),
+        s.feeling_emoji ? el('span', 'emo', s.feeling_emoji) : null,
+        el('span', 'pos', `[${POSITION_TAG[m.position] || 'member'}]`),
+        el('span', 'left', `since ${hhmm(s.last_check_in)} · ${duration(s.last_check_in, now)}`),
+        el('span', 'wbadge', 'WFH'));
+    }));
 
     $('outHead').textContent = `// members :: status=OUT [${outs.length}]`;
     $('outList').replaceChildren(...outs.map((m, i) => {

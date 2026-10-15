@@ -53,8 +53,8 @@
       <!-- counts -->
       <section class="stats">
         <div class="stat stat-in"><span class="k">in_lab:</span> <span class="v" id="statIn">00</span></div>
+        <div class="stat stat-wfh"><span class="k">wfh:</span> <span class="v" id="statWfh">00</span></div>
         <div class="stat"><span class="k">out:</span> <span class="v" id="statOut">00</span></div>
-        <div class="stat"><span class="k">total:</span> <span class="v" id="statTotal">00</span></div>
       </section>
 
       <!-- members -->
@@ -63,6 +63,9 @@
         <div class="section-head" id="inHead">// members :: status=IN [0]</div>
         <div class="in-grid" id="inList"></div>
         <div class="empty" id="inEmpty" hidden>&gt; <span id="emptyMsg">lab is empty.</span><span class="cursor"></span></div>
+
+        <div class="section-head wfh-head" id="wfhHead" hidden>// members :: status=WFH [0]</div>
+        <div class="out-grid wfh-grid" id="wfhList" hidden></div>
 
         <div class="section-head out-head" id="outHead">// members :: status=OUT [0]</div>
         <div class="out-grid" id="outList"></div>

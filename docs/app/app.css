@@ -167,6 +167,10 @@ input::placeholder { color: #9aa3ad; }
 }
 .badge.in { border-color: var(--accent); color: var(--accent-ink); background: var(--surface); }
 .continue { border-left-color: var(--accent); background: var(--accent-soft); }
+/* WFH (work from home): same as IN but a dashed, calmer look */
+.member.wfh { border-left-style: dashed; }
+.badge.wfh { border-style: dashed; color: var(--ink-2); }
+.btn.wfh { border-style: dashed; font-size: 1.05em; min-height: 3.2em; }
 
 /* ── PIN pad ───────────────────────────────────────────────── */
 .who-head { display: flex; align-items: center; gap: .9em; margin: .3em 0 1em; }

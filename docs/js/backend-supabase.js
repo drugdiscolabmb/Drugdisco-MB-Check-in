@@ -48,6 +48,7 @@ LAB.createSupabaseBackend = function (url, key) {
     last_check_out: ms(s && s.last_check_out),
     feeling_emoji: (s && s.feeling_emoji) || null,
     feeling_text: (s && s.feeling_text) || null,
+    location: (s && s.location) === 'wfh' ? 'wfh' : 'lab',     // 'lab' or 'wfh' (work from home)
   });
   const fullName = (m) => ({ ...m, full_name: m.full_name || '' });
 
@@ -125,13 +126,19 @@ LAB.createSupabaseBackend = function (url, key) {
     },
     async verify(id, pin) { await rpc('verify', { p_id: id, p_pin: pin }); },
 
-    async checkIn(id, pin, feeling = {}) {
-      const r = await rpc('check_in', { p_id: id, p_pin: pin, p_emoji: feeling.emoji || null, p_text: feeling.text || null });
+    async checkIn(id, pin, feeling = {}, location = 'lab') {
+      const r = await rpc('check_in', { p_id: id, p_pin: pin, p_emoji: feeling.emoji || null, p_text: feeling.text || null, p_location: location });
       changed();
       return statusMs(r.status);
     },
     async checkOut(id, pin) {
       const r = await rpc('check_out', { p_id: id, p_pin: pin });
+      changed();
+      return statusMs(r.status);
+    },
+    /* lab ⇄ WFH without checking out */
+    async switchLocation(id, pin, location) {
+      const r = await rpc('switch_location', { p_id: id, p_pin: pin, p_location: location });
       changed();
       return statusMs(r.status);
     },

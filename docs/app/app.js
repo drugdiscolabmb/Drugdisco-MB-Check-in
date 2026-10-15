@@ -21,6 +21,10 @@
     'laptop closed, brain off.', 'see you tomorrow (probably).', 'good work today.',
     "the simulation can finish without you.", 'remember to drink water.',
   ];
+  const HELLO_WFH = [
+    'comfy pants mode: on.', 'the commute today: 5 steps.', 'pets count as coworkers.',
+    'remember to actually get dressed.', 'home office, real results.', 'stay hydrated, stay online.',
+  ];
   const HELLO = [
     "let's get some data.", 'the GPUs missed you.', 'may your loss go down.',
     'coffee first, science second.', 'today is a good day for results.', 'p < 0.05 vibes only.',
@@ -32,6 +36,8 @@
   const dur = (from) => { const m = Math.max(0, Math.floor((Date.now() - from) / 60000)); return m >= 60 ? `${Math.floor(m / 60)}h ${pad2(m % 60)}m` : `${m}m`; };
   const initials = (n) => (n.length > 1 ? n[0] + n[n.length - 1] : n).toUpperCase();
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const isWfh = (s) => !!(s && s.is_in && s.location === 'wfh');
+  const where = (s) => (isWfh(s) ? 'WFH' : 'IN');               // short status word
   const remember = (id) => { try { localStorage.setItem(LAST_USER, id); } catch (e) { /* ignore */ } };
   const remembered = () => { try { return localStorage.getItem(LAST_USER); } catch (e) { return null; } };
 
@@ -108,12 +114,12 @@
 
     const row = (m, extra) => {
       const s = status[m.id];
-      return el('li', {}, el('button', { class: `member ${s.is_in ? 'in' : ''} ${extra || ''}`, onclick: () => pinScreen(m) },
+      return el('li', {}, el('button', { class: `member ${s.is_in ? 'in' : ''} ${isWfh(s) ? 'wfh' : ''} ${extra || ''}`, onclick: () => pinScreen(m) },
         avatarEl(m),
         el('span', { class: 'who' },
           el('span', { class: 'nick' }, m.nickname, el('span', { class: 'at' }, '@lab')),
-          el('span', { class: 'pos' }, s.is_in ? `in since ${hhmm(s.last_check_in)} · ${dur(s.last_check_in)}` : `[${POSITION_TAG[m.position] || 'member'}]`)),
-        el('span', { class: `badge ${s.is_in ? 'in' : ''}` }, s.is_in ? 'IN' : 'OUT')));
+          el('span', { class: 'pos' }, s.is_in ? `${isWfh(s) ? 'wfh' : 'in'} since ${hhmm(s.last_check_in)} · ${dur(s.last_check_in)}` : `[${POSITION_TAG[m.position] || 'member'}]`)),
+        el('span', { class: `badge ${s.is_in ? 'in' : ''} ${isWfh(s) ? 'wfh' : ''}` }, s.is_in ? where(s) : 'OUT')));
     };
 
     const list = el('ul', { class: 'members' });
@@ -190,7 +196,7 @@
     const pad = pinPad({
       onPin: async (pin) => { await api.verify(m.id, pin); remember(m.id); memberScreen(m, pin); },
     });
-    show(back(), whoHead(m, s.is_in ? `IN since ${hhmm(s.last_check_in)}` : 'currently OUT'),
+    show(back(), whoHead(m, s.is_in ? `${where(s)} since ${hhmm(s.last_check_in)}` : 'currently OUT'),
       prompt(`$ login --user=${m.nickname}`),
       el('h1', { class: 'big' }, 'enter your PIN'),
       pad.node,
@@ -223,16 +229,20 @@
 
     if (!s.is_in) {
       const picker = feelingPicker();
+      const checkIn = (loc) => run(async () => {
+        const f = picker.value();
+        const st = await api.checkIn(m.id, pin, f, loc);
+        const wfh = loc === 'wfh';
+        done([`$ checkin --user=${m.nickname} --at=${wfh ? 'home' : 'lab'}`, '> verifying PIN ........ <ok>OK</ok>', '> writing to lab log ... <ok>OK</ok>',
+          f.emoji || f.text ? `> feeling: ${[f.emoji, f.text].filter(Boolean).join(' ')}` : null,
+          wfh ? `<hl>✓ WFH started, ${m.nickname} — ${hhmm(st.last_check_in)}</hl>` : `<hl>✓ welcome in, ${m.nickname} — ${hhmm(st.last_check_in)}</hl>`,
+          `> ${pick(wfh ? HELLO_WFH : HELLO)}`]);
+      });
       show(back(home, 'not you?'), whoHead(m, 'currently OUT'),
         prompt(`$ checkin --user=${m.nickname}`),
         picker.node, msg,
-        el('button', { class: 'btn primary', onclick: () => run(async () => {
-          const f = picker.value();
-          const st = await api.checkIn(m.id, pin, f);
-          done([`$ checkin --user=${m.nickname}`, '> verifying PIN ........ <ok>OK</ok>', '> writing to lab log ... <ok>OK</ok>',
-            f.emoji || f.text ? `> feeling: ${[f.emoji, f.text].filter(Boolean).join(' ')}` : null,
-            `<hl>✓ welcome in, ${m.nickname} — ${hhmm(st.last_check_in)}</hl>`, `> ${pick(HELLO)}`]);
-        }) }, '▶ CHECK IN'),
+        el('button', { class: 'btn primary', onclick: () => checkIn('lab') }, '▶ CHECK IN · LAB'),
+        el('button', { class: 'btn wfh', onclick: () => checkIn('wfh') }, '▶ WORK FROM HOME'),
         el('div', { class: 'row' },
           el('button', { class: 'linkbtn', onclick: () => profileScreen(m, pin) }, 'edit my look'),
           el('button', { class: 'linkbtn', onclick: () => changePin(m, pin) }, 'change my PIN')));
@@ -240,8 +250,8 @@
       const picker = feelingPicker({ emoji: s.feeling_emoji, text: s.feeling_text });
       show(back(home, 'not you?'), whoHead(m),
         el('div', { class: 'statusbox' },
-          el('div', { class: 'big' }, `IN since ${hhmm(s.last_check_in)}`),
-          el('div', { class: 'small muted' }, `${dur(s.last_check_in)} in the lab today`)),
+          el('div', { class: 'big' }, `${isWfh(s) ? 'WFH' : 'IN LAB'} since ${hhmm(s.last_check_in)}`),
+          el('div', { class: 'small muted' }, `${dur(s.last_check_in)} ${isWfh(s) ? 'working from home' : 'in the lab'}`)),
         picker.node, msg,
         el('button', { class: 'btn', onclick: () => run(async () => {
           const f = picker.value();
@@ -249,11 +259,18 @@
           done([`$ mood --set --user=${m.nickname}`, `> feeling: ${[f.emoji, f.text].filter(Boolean).join(' ') || '(cleared)'}`,
             '<hl>✓ feeling updated</hl>', '> the wall screen shows it now.'], 3);
         }) }, '✎ update feeling'),
+        el('button', { class: 'btn', onclick: () => run(async () => {
+          const to = isWfh(s) ? 'lab' : 'wfh';
+          const st = await api.switchLocation(m.id, pin, to);
+          done([`$ move --user=${m.nickname} --to=${to === 'wfh' ? 'home' : 'lab'}`, '> writing to lab log ... <ok>OK</ok>',
+            to === 'wfh' ? `<hl>✓ now working from home — ${hhmm(st.last_check_in)}</hl>` : `<hl>✓ now in the lab — ${hhmm(st.last_check_in)}</hl>`,
+            `> ${pick(to === 'wfh' ? HELLO_WFH : HELLO)}`], 4);
+        }) }, isWfh(s) ? '⇄ I came to the lab' : '⇄ switch to WFH'),
         el('button', { class: 'btn danger primary', onclick: () => run(async () => {
           const since = s.last_check_in;
           await api.checkOut(m.id, pin);
           done([`$ checkout --user=${m.nickname}`, '> verifying PIN ........ <ok>OK</ok>', '> writing to lab log ... <ok>OK</ok>',
-            `<hl>✓ see you, ${m.nickname} — ${dur(since)} today</hl>`, `> ${pick(BYE)}`]);
+            `<hl>✓ see you, ${m.nickname} — ${dur(since)}${isWfh(s) ? ' WFH' : ''} today</hl>`, `> ${pick(BYE)}`]);
         }) }, '◀ CHECK OUT'),
         el('div', { class: 'row' },
           el('button', { class: 'linkbtn', onclick: () => profileScreen(m, pin) }, 'edit my look'),
@@ -494,10 +511,10 @@
       const pinBox = el('div');
       return el('div', { class: `card ${m.status === 'inactive' ? 'inactive' : ''}` },
         el('div', {}, el('span', { class: 'nick' }, m.nickname, el('span', { class: 'at' }, '@lab')), ' ',
-          s.is_in ? el('span', { class: 'badge in' }, 'IN') : null, ' ',
+          s.is_in ? el('span', { class: `badge in ${isWfh(s) ? 'wfh' : ''}` }, where(s)) : null, ' ',
           m.is_admin ? el('span', { class: 'badge' }, 'admin') : null, ' ',
           m.status === 'inactive' ? el('span', { class: 'badge' }, 'inactive') : null),
-        el('div', { class: 'meta' }, `${m.full_name} · ${m.position}${s.is_in ? ` · in since ${hhmm(s.last_check_in)}` : ''}`),
+        el('div', { class: 'meta' }, `${m.full_name} · ${m.position}${s.is_in ? ` · ${isWfh(s) ? 'wfh' : 'in'} since ${hhmm(s.last_check_in)}` : ''}`),
         el('div', { class: 'chips' },
           s.is_in ? el('button', { class: 'chip', onclick: () => act(() => api.forceCheckOut(session, m.id), `${m.nickname} checked out`) }, '◀ check out') : null,
           el('button', { class: 'chip', onclick: async () => {

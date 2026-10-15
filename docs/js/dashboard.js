@@ -334,12 +334,16 @@
     $('wfhHead').textContent = `// members :: status=WFH [${homes.length}]`;
     $('wfhList').replaceChildren(...homes.map((m) => {
       const s = st(m);
+      const av = el('span', 'avatar mini');                       // pixel face, or initials if none
+      if (m.avatar && LAB.AVATAR) { av.innerHTML = LAB.AVATAR.svg(m.avatar); av.classList.add('face'); }
+      else av.textContent = m.initials || initials(m.nickname);
       return el('div', 'out-row wfh-row',
         el('span', 'ini', m.initials || initials(m.nickname)),
+        av,
         el('span', 'nick', m.nickname, el('span', 'at', '@home')),
         s.feeling_emoji ? el('span', 'emo', s.feeling_emoji) : null,
         el('span', 'pos', `[${POSITION_TAG[m.position] || 'member'}]`),
-        el('span', 'left', `since ${hhmm(s.last_check_in)} · ${duration(s.last_check_in, now)}`),
+        el('span', 'left', `${hhmm(s.last_check_in)} · ${duration(s.last_check_in, now)}`),
         el('span', 'wbadge', 'WFH'));
     }));
 

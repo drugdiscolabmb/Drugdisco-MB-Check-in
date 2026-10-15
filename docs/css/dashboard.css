@@ -385,6 +385,8 @@ body.hide-cursor, body.hide-cursor * { cursor: none !important; }
 .wfh-row .nick { font-weight: 800; color: var(--ink); }
 .wfh-row .pos { color: var(--muted); }
 .wfh-row .emo { font-size: .95em; }
+.wfh-row .avatar.mini { width: 1.9em; height: 1.9em; font-size: .7em; align-self: center; }
+.wfh-row .avatar.mini.face { font-size: 1em; }
 .wfh-row .left { color: var(--accent-ink); font-weight: 600; }
 .wfh-row .wbadge {
   padding: .05em .5em; border: 1px dashed var(--accent); color: var(--accent-ink);

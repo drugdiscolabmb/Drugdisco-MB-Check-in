@@ -34,6 +34,7 @@ LAB.createSupabaseBackend = function (url, key) {
     let data = null;
     try { data = await res.json(); } catch (e) { /* empty body */ }
     if (!res.ok) {
+      if (data && data.code === 'PGRST202') throw new Error('the lab database needs an update — ask an admin to run supabase/setup.sql again');
       const why = (data && (data.message || data.hint)) || res.statusText;
       throw new Error(`database error (${res.status}): ${why}`);
     }
@@ -127,7 +128,9 @@ LAB.createSupabaseBackend = function (url, key) {
     async verify(id, pin) { await rpc('verify', { p_id: id, p_pin: pin }); },
 
     async checkIn(id, pin, feeling = {}, location = 'lab') {
-      const r = await rpc('check_in', { p_id: id, p_pin: pin, p_emoji: feeling.emoji || null, p_text: feeling.text || null, p_location: location });
+      const args = { p_id: id, p_pin: pin, p_emoji: feeling.emoji || null, p_text: feeling.text || null };
+      if (location === 'wfh') args.p_location = 'wfh';          // lab check-in also works on an older database
+      const r = await rpc('check_in', args);
       changed();
       return statusMs(r.status);
     },
